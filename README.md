@@ -23,9 +23,9 @@ After building the plugin, you can add the plugin to a Maven project by modifyin
         <className>edu.illinois.cs.dt.tools.fixer.CleanerFixerPlugin</className>
     </configuration>
 </plugin>
-'''
+```
 
 Run the following command on the Maven project:
 ```
 mvn testrunner:testplugin
-'''
+```
