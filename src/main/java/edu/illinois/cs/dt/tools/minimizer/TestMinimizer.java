@@ -12,6 +12,7 @@ import edu.illinois.cs.dt.tools.minimizer.cleaner.CleanerFinder;
 import edu.illinois.cs.dt.tools.minimizer.cleaner.CleanerGroup;
 import edu.illinois.cs.dt.tools.utility.MD5;
 import edu.illinois.cs.dt.tools.utility.OperationTime;
+import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.data.results.Result;
 import edu.illinois.cs.testrunner.data.results.TestRunResult;
 import edu.illinois.cs.testrunner.mavenplugin.TestPluginPlugin;
@@ -34,6 +35,8 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
     protected final Path path;
 
     protected TestRunResult expectedRun;
+
+    private static final boolean FIND_ALL = Configuration.config().getProperty("dt.find_all", true);
 
     private void debug(final String str) {
         TestPluginPlugin.mojo().getLog().debug(str);
@@ -130,6 +133,11 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
                 }
 
                 polluters.add(new PolluterData(operationTime[0], index, deps, cleanerData));
+
+                // If not configured to find all, since one is found now, can stop looking
+                if (!FIND_ALL) {
+                    break;
+                }
 
                 order.removeAll(deps);  // Look for other deps besides the ones already found
                 index++;

@@ -7,6 +7,7 @@ import edu.illinois.cs.dt.tools.runner.RunnerPathManager;
 import edu.illinois.cs.dt.tools.utility.OperationTime;
 import edu.illinois.cs.dt.tools.utility.TestRunParser;
 import edu.illinois.cs.dt.tools.utility.TimeManager;
+import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.data.results.Result;
 import edu.illinois.cs.testrunner.data.results.TestRunResult;
 import edu.illinois.cs.testrunner.mavenplugin.TestPluginPlugin;
@@ -40,6 +41,8 @@ public class CleanerFinder {
     // Some fields to help with tracking when it is "desperately" trying all tests
     private int startingTryingEveryTest = -1;
     private int startingTryingEveryTestConfirmed = -1;
+
+    private static final boolean FIND_ALL = Configuration.config().getProperty("dt.find_all", true);
 
     public CleanerFinder(final SmartRunner runner,
                          final String dependentTest, final List<String> deps,
@@ -167,6 +170,11 @@ public class CleanerFinder {
                     TestPluginPlugin.info("FIRST CLEANER: Found first cleaner " + candidate + " for dependent test " + dependentTest + " in " + elapsedSeconds + " seconds.");
                 } else {
                     TestPluginPlugin.info("CLEANER: Found cleaner " + candidate + " for dependent test " + dependentTest + " in " + elapsedSeconds + " seconds.");
+                }
+
+                // If not configured to find all, since one is found now, can stop looking
+                if (!FIND_ALL) {
+                    break;
                 }
             }
         }
