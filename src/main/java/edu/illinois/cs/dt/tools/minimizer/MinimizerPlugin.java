@@ -8,24 +8,24 @@ import edu.illinois.cs.dt.tools.detection.detectors.RandomDetector;
 import edu.illinois.cs.dt.tools.runner.InstrumentingSmartRunner;
 import edu.illinois.cs.dt.tools.runner.data.DependentTest;
 import edu.illinois.cs.dt.tools.runner.data.DependentTestList;
+import edu.illinois.cs.dt.tools.runner.data.TestRun;
 import edu.illinois.cs.dt.tools.utility.ErrorLogger;
 import edu.illinois.cs.testrunner.configuration.Configuration;
+import edu.illinois.cs.testrunner.data.results.Result;
 import edu.illinois.cs.testrunner.mavenplugin.TestPlugin;
 import edu.illinois.cs.testrunner.mavenplugin.TestPluginPlugin;
-import edu.illinois.cs.testrunner.runner.RunnerFactory;
-import edu.illinois.cs.dt.tools.runner.data.TestRun;
-import edu.illinois.cs.testrunner.data.results.Result;
 import edu.illinois.cs.testrunner.runner.Runner;
+import edu.illinois.cs.testrunner.runner.RunnerFactory;
 import org.apache.maven.project.MavenProject;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
-import java.util.Collections;
 
 public class MinimizerPlugin extends TestPlugin {
     private TestMinimizerBuilder builder;
@@ -95,7 +95,7 @@ public class MinimizerPlugin extends TestPlugin {
 
         if (VERIFY_DTS) {
             if (!intended.verify(name, runner, null) || !revealed.verify(name, runner, null)) {
-		return Stream.of(minimizerBuilder.buildNOD());
+                return Stream.of(minimizerBuilder.buildNOD());
             }
         }
 
@@ -111,18 +111,25 @@ public class MinimizerPlugin extends TestPlugin {
             }
         }
 
+        TestMinimizer tm;
         if (originalOrder != null) {
             TestPluginPlugin.info("Using original order to run Minimizer instead of intended or revealed order.");
             if (!isolationResult.equals(Result.PASS)) {
-                return Stream.of(minimizerBuilder.testOrder(reorderOriginalOrder(intended.order(), originalOrder)).build());
+                tm = minimizerBuilder.testOrder(reorderOriginalOrder(intended.order(), originalOrder)).build();
             } else {
-                return Stream.of(minimizerBuilder.testOrder(reorderOriginalOrder(revealed.order(), originalOrder)).build());
+                tm = minimizerBuilder.testOrder(reorderOriginalOrder(revealed.order(), originalOrder)).build();
             }
         } else if (!isolationResult.equals(Result.PASS)) { // Does not pass in isolation, needs setter, so need to minimize passing order
-            return Stream.of(minimizerBuilder.testOrder(intended.order()).build());
+            tm = minimizerBuilder.testOrder(intended.order()).build();
+            
         } else {    // Otherwise passes in isolation, needs polluter, so need to minimize failing order
-            return Stream.of(minimizerBuilder.testOrder(revealed.order()).build());
+            tm = minimizerBuilder.testOrder(revealed.order()).build();
         }
+        String victimBrittleStr = !isolationResult.equals(Result.PASS) 
+                ? "Test is brittle. Result of running test in isolation is: " + isolationResult
+                : "Test is victim. Result of running test in isolation is: " + isolationResult;
+        TestPluginPlugin.info(victimBrittleStr);
+        return Stream.of(tm);
     }
 
 
