@@ -186,7 +186,7 @@ public class CleanerFixerPlugin extends TestPlugin {
             }
         }
 
-        return new MinimizerPlugin(runner).runDependentTestFile(DetectorPathManager.detectionFile());
+        return new MinimizerPlugin(runner).runDependentTestFile(DetectorPathManager.detectionFile(), project);
     }
 
     private boolean sameTestClass(String test1, String test2) {
