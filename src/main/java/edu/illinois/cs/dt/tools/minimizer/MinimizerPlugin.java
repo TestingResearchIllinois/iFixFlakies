@@ -21,6 +21,7 @@ import org.apache.maven.project.MavenProject;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +35,8 @@ public class MinimizerPlugin extends TestPlugin {
     private final boolean GENERATE_FLAKIES = Configuration.config().getProperty("dt.minimizer.generate.list.flakies", false);
     private final boolean USE_ORIGINAL_ORDER = Configuration.config().getProperty("dt.minimizer.use.original.order", false);
     private static final boolean VERIFY_DTS = Configuration.config().getProperty("dt.verify", true);
+    private final String FLAKY_LIST = Configuration.config().getProperty("dt.minimizer.flaky.list", null);
+    private final String ORIGINAL_ORDER = Configuration.config().getProperty("dt.minimizer.original.order", null);
 
     /**
      * This will clear all the cached test runs!
@@ -48,22 +51,34 @@ public class MinimizerPlugin extends TestPlugin {
         this.builder = new TestMinimizerBuilder(runner);
     }
 
-    private Stream<TestMinimizer> fromDtList(final Path path, MavenProject project) {
+    private Stream<TestMinimizer> fromDtList(Path path, MavenProject project) {
+        if (FLAKY_LIST != null) {
+            path = Paths.get(FLAKY_LIST);
+            TestPluginPlugin.info("dt.minimizer.flaky.list argument specified: " + FLAKY_LIST);
+        }
         TestPluginPlugin.info("Creating minimizers for file: " + path);
 
         try {
-            List<String> originalOrder = DetectorPlugin.getOriginalOrder(project);
+            List<String> originalOrder;
+            if (ORIGINAL_ORDER != null) {
+                TestPluginPlugin.info("Using specified original order. dt.minimizer.original.order argument specified: " + ORIGINAL_ORDER);
+                originalOrder = Files.readAllLines(Paths.get(ORIGINAL_ORDER));
+            } else {
+                originalOrder = DetectorPlugin.getOriginalOrder(project);
+            }
 
             if (!Files.exists(DetectorPathManager.originalOrderPath()) || originalOrder.isEmpty()) {
                 TestPluginPlugin.info("Original order file not found or is empty. Creating original-order file now at: "
-                                              + DetectorPathManager.originalOrderPath());
+                                      + DetectorPathManager.originalOrderPath());
                 originalOrder = DetectorPlugin.getOriginalOrder(project, true);
                 Files.write(DetectorPathManager.originalOrderPath(), originalOrder);
             }
 
             DependentTestList dependentTestList = DependentTestList.fromFile(path);
             if (dependentTestList == null && !GENERATE_FLAKIES) {
-                throw new IllegalArgumentException("Dependent test list file is empty");
+                throw new IllegalArgumentException("Dependent test list file is empty. " +
+                                                   "If you would like iFixFlakies to try generating passing/failing orders using random-class-method, try running iFixFlakies with -Ddt.minimizer.generate.list.flakies=true. " +
+                                                   "You can control the rounds for iFixFlakies to generate passing/failing orders with -Ddt.randomize.rounds=X where X is an integer. The default is 20.");
             } else if (dependentTestList == null) {
                 // Run random class method a few times to see if test would be OD
                 Detector detector = new RandomDetector("random", runner,
