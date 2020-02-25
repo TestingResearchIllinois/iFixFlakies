@@ -31,6 +31,7 @@ public class MinimizerPlugin extends TestPlugin {
     private TestMinimizerBuilder builder;
     private InstrumentingSmartRunner runner;
     private final String TEST_TO_MINIMIZE = Configuration.config().getProperty("dt.minimizer.dependent.test", null);
+    private final boolean GENERATE_FLAKIES = Configuration.config().getProperty("dt.minimizer.generate.list.flakies", false);
     private final boolean USE_ORIGINAL_ORDER = Configuration.config().getProperty("dt.minimizer.use.original.order", false);
     private static final boolean VERIFY_DTS = Configuration.config().getProperty("dt.verify", true);
 
@@ -56,11 +57,21 @@ public class MinimizerPlugin extends TestPlugin {
             if (!Files.exists(DetectorPathManager.originalOrderPath()) || originalOrder.isEmpty()) {
                 TestPluginPlugin.info("Original order file not found or is empty. Creating original-order file now at: "
                                               + DetectorPathManager.originalOrderPath());
-                originalOrder = DetectorPlugin.getOriginalOrder(project);
+                originalOrder = DetectorPlugin.getOriginalOrder(project, true);
                 Files.write(DetectorPathManager.originalOrderPath(), originalOrder);
             }
 
             DependentTestList dependentTestList = DependentTestList.fromFile(path);
+            if (dependentTestList == null && !GENERATE_FLAKIES) {
+                throw new IllegalArgumentException("Dependent test list file is empty");
+            } else if (dependentTestList == null) {
+                // Run random class method a few times to see if test would be OD
+                Detector detector = new RandomDetector("random", runner,
+                                                       DetectorPlugin.moduleRounds(new ErrorLogger(project).coordinates()),
+                                                       originalOrder);
+                dependentTestList = new DependentTestList(detector.detect());
+            }
+
             if (TEST_TO_MINIMIZE != null) {
                 TestPluginPlugin.info("Filtering dependent test list to run only for: " + TEST_TO_MINIMIZE);
                 Optional<DependentTest> dependentTest = dependentTestList.dts().stream().
@@ -131,7 +142,6 @@ public class MinimizerPlugin extends TestPlugin {
         TestPluginPlugin.info(victimBrittleStr);
         return Stream.of(tm);
     }
-
 
     private List<String> reorderOriginalOrder(List<String> intended, List<String> originalOrder) {
         List<String> retList = new ArrayList<>(intended);
