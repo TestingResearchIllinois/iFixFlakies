@@ -56,7 +56,7 @@ public class MinimizerPlugin extends TestPlugin {
             path = Paths.get(FLAKY_LIST);
             TestPluginPlugin.info("dt.minimizer.flaky.list argument specified: " + FLAKY_LIST);
         }
-        TestPluginPlugin.info("Creating minimizers for file: " + path);            
+        TestPluginPlugin.info("Creating minimizers for file: " + path);
 
         try {
             List<String> originalOrder;
