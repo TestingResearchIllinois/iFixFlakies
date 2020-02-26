@@ -1,3 +1,5 @@
+package edu.illinois.cs.dt.tools.utility;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -6,21 +8,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.PathMatcher;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -34,27 +23,19 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.Document;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import org.xml.sax.SAXException;
 
-import static java.nio.file.FileVisitResult.CONTINUE;
-
 public class PomFile {
 
     private String pom;
     private String fullPath;
-    private String groupId;
     private String artifactId;
     private String srcDir;
     private String testDir;
     private String outputDir;
-    private List<String> srcClasses = new ArrayList<String>();
-    private List<String> testClasses = new ArrayList<String>();
-    private List<String> dependencyIds = new ArrayList<String>();
-
     private static final String ARTIFACT_ID = "ifixflakies";
     private static final String CONFIGURATION_CLASS = "edu.illinois.cs.dt.tools.fixer.CleanerFixerPlugin";
     private static String ARTIFACT_VERSION = "1.0.0-SNAPSHOT";
@@ -69,35 +50,19 @@ public class PomFile {
 
         // Parse document for basic fields
         parseFields(pom);
-
-        // Find classes (source and test) associated with this pom project
-        setClasses();
     }
 
     private void parseFields(String pom) {
         File pomFile = new File(pom);
-    	DocumentBuilderFactory dbFactory = DocumentBuilderFactory
-            .newInstance();
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         dbFactory.setNamespaceAware(false);
         dbFactory.setValidating(false);
-    	DocumentBuilder dBuilder;
+        DocumentBuilder dBuilder;
 
         try {
 
             dBuilder = dbFactory.newDocumentBuilder();
             Document doc = dBuilder.parse(pomFile);
-
-            // First find groupId by looking at parent
-            if (doc.getElementsByTagName("parent").getLength() == 1) {
-                Node parent = doc.getElementsByTagName("parent").item(0);
-                NodeList parentChildren = parent.getChildNodes();
-                for (int i = 0; i < parentChildren.getLength(); i++) {
-                    Node n = parentChildren.item(i);
-                    if (n.getNodeName().equals("groupId")) {
-                        this.groupId = n.getTextContent();
-                    }
-                }
-            }
 
             // Find high-level groupId and artifact Id
             Node project = doc.getElementsByTagName("project").item(0);
@@ -107,9 +72,6 @@ public class PomFile {
             NodeList projectChildren = project.getChildNodes();
             for (int i = 0; i < projectChildren.getLength(); i++) {
                 Node n = projectChildren.item(i);
-                if (n.getNodeName().equals("groupId")) {
-                    this.groupId = n.getTextContent();
-                }
                 if (n.getNodeName().equals("artifactId")) {
                     this.artifactId = n.getTextContent();
                 }
@@ -138,38 +100,7 @@ public class PomFile {
                     }
                 }
             }
-
-            // Search for relevant tags in dependencies
-            this.dependencyIds = new ArrayList<String>();
-            if (doc.getElementsByTagName("dependencies").getLength() > 0) {
-                for (int k = 0; k < doc.getElementsByTagName("dependencies").getLength(); k++) {
-                    Node dependencies = doc.getElementsByTagName("dependencies").item(k);
-                    NodeList dependenciesChildren = dependencies.getChildNodes();
-                    for (int i = 0; i < dependenciesChildren.getLength(); i++) {
-                        Node dependency = dependenciesChildren.item(i);
-                        if (dependency.getNodeName().equals("dependency")) {
-                            String local_groupId = "";
-                            String local_artifactId = "";
-                            NodeList dependencyChildren = dependency.getChildNodes();
-                            for (int j = 0; j < dependencyChildren.getLength(); j++) {
-                                Node n = dependencyChildren.item(j);
-                                if (n.getNodeName().equals("groupId")) {
-                                    local_groupId = n.getTextContent();
-                                }
-                                if (n.getNodeName().equals("artifactId")) {
-                                    local_artifactId = n.getTextContent();
-                                }
-                            }
-                            if ((local_groupId.equals(this.groupId) || local_groupId.equals("${project.groupId}")) && !local_artifactId.equals("")) {
-                                this.dependencyIds.add(local_artifactId);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (ParserConfigurationException e) {
-            e.printStackTrace();
-        } catch (SAXException e) {
+        } catch (ParserConfigurationException | SAXException e) {
             e.printStackTrace();
         } catch (FileNotFoundException e) {
             System.out.println("File does not exit: " + pom);
@@ -189,53 +120,13 @@ public class PomFile {
         }
     }
 
-    private void setClasses() {
-        String fullSrcDir = this.fullPath + "/" + this.srcDir;
-        String fullTestDir = this.fullPath + "/" + this.testDir;
-
-        try {
-            List<String> srcClassPaths = new ArrayList<String>();
-            if (new File(fullSrcDir).exists()) {
-                Finder finder = new Finder("*.java");
-                Files.walkFileTree(Paths.get(fullSrcDir), finder);
-                srcClassPaths.addAll(finder.getMatches());
-            }
-
-            List<String> testClassPaths = new ArrayList<String>();
-            if (new File(fullTestDir).exists()) {
-                Finder finder = new Finder("*.java");
-                Files.walkFileTree(Paths.get(fullTestDir), finder);
-                testClassPaths.addAll(finder.getMatches());
-            }
-            this.srcClasses = convertToClasses(srcClassPaths, this.srcDir);
-            this.testClasses = convertToClasses(testClassPaths, this.testDir);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private List<String> convertToClasses(List<String> classPaths, String srcPath) {
-        List<String> classes = new ArrayList<String>();
-        for (String classPath : classPaths) {
-            if (srcPath.charAt(srcPath.length()-1) == '/') {
-                classes.add(classPath.replace(this.fullPath + "/" + srcPath, "").replace(".java","").replace("/", "."));
-            }
-            else {
-                classes.add(classPath.replace(this.fullPath + "/" + srcPath + "/", "").replace(".java","").replace("/", "."));
-            }
-        }
-
-        return classes;
-    }
-
     // Rewrite contents of own pom.xml, augmented with information about dependency srcs and dependency outputs
-    public void rewrite(Set<String> dependencySrcs, Set<String> outputDirectories) {
+    public void rewrite() {
         File pomFile = new File(this.pom);
-    	DocumentBuilderFactory dbFactory = DocumentBuilderFactory
-            .newInstance();
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         dbFactory.setNamespaceAware(false);
         dbFactory.setValidating(false);
-    	DocumentBuilder dBuilder;
+        DocumentBuilder dBuilder;
 
         try {
             dBuilder = dbFactory.newDocumentBuilder();
@@ -288,161 +179,73 @@ public class PomFile {
             String output = writer.getBuffer().toString();
 
             // Rewrite the pom file with this string
-            PrintWriter filewriter = new PrintWriter(this.pom);
-            filewriter.println(output);
-            filewriter.close();
+            PrintWriter fileWriter = new PrintWriter(this.pom);
+            fileWriter.println(output);
+            fileWriter.close();
 
-        } catch (ParserConfigurationException e) {
-            e.printStackTrace();
-        } catch (SAXException e) {
+        } catch (ParserConfigurationException | SAXException | TransformerException e) {
             e.printStackTrace();
         } catch (FileNotFoundException e) {
             System.out.println("File does not exit: " + this.pom);
         } catch (IOException e) {
             e.printStackTrace();
-        } catch (TransformerException e) {
-            e.printStackTrace();
         }
     }
 
     private void addPlugin(Node plugins, Document doc) {
-      {
-          Node plugin = doc.createElement("plugin");
-          {
-              Node groupId = doc.createElement("groupId");
-              groupId.setTextContent("edu.illinois.cs");
-              plugin.appendChild(groupId);
-          }
-          {
-              Node artifactId = doc.createElement("artifactId");
-              artifactId.setTextContent("testrunner-maven-plugin");
-              plugin.appendChild(artifactId);
-          }
-          {
-              Node version = doc.createElement("version");
-              version.setTextContent("1.0");
-              plugin.appendChild(version);
-          }
-          {
-              Node dependencies = doc.createElement("dependencies");
-              {
-                  Node dependency = doc.createElement("dependency");
-                  {
-                      Node depGroupId = doc.createElement("groupId");
-                      depGroupId.setTextContent("edu.illinois.cs");
-                      dependency.appendChild(depGroupId);
-
-                      Node depArtifactId = doc.createElement("artifactId");
-                      depArtifactId.setTextContent(ARTIFACT_ID);
-                      dependency.appendChild(depArtifactId);
-
-                      Node depVersion = doc.createElement("version");
-                      depVersion.setTextContent(ARTIFACT_VERSION);
-                      dependency.appendChild(depVersion);
-                  }
-                  dependencies.appendChild(dependency);
-              }
-              plugin.appendChild(dependencies);
-          }
-          {
-              Node configuration = doc.createElement("configuration");
-              {
-                  Node className = doc.createElement("className");
-                  className.setTextContent(CONFIGURATION_CLASS);
-                  configuration.appendChild(className);
-              }
-              plugin.appendChild(configuration);
-          }
-          plugins.appendChild(plugin);
-      }
-    }
-
-    // Accessors
-    public String getFullPath() {
-        return this.fullPath;
-    }
-
-    public String getArtifactId() {
-        return this.artifactId;
-    }
-
-    public String getGroupId() {
-        return this.groupId;
-    }
-
-    public String getSrcDir() {
-        return this.srcDir;
-    }
-
-    public String getTestDir() {
-        return this.testDir;
-    }
-
-    public String getOutputDir() {
-        return this.outputDir;
-    }
-
-    public List<String> getSrcClasses() {
-        return this.srcClasses;
-    }
-
-    public List<String> getTestClasses() {
-        return this.testClasses;
-    }
-
-    public List<String> getDependencyIds() {
-        return this.dependencyIds;
-    }
-
-    // Helper class to implement find functionality in Java
-    public static class Finder extends SimpleFileVisitor<Path> {
-
-        private final PathMatcher matcher;
-        private List<String> matches;
-
-        public Finder(String pattern) {
-            this.matches = new ArrayList<String>();
-            this.matcher = FileSystems.getDefault()
-                .getPathMatcher("glob:" + pattern);
-        }
-
-        // Compares the glob pattern against
-        // the file or directory name.
-        public void find(Path file) {
-            Path name = file.getFileName();
-            if (name != null && matcher.matches(name)) {
-                this.matches.add(file.toAbsolutePath().normalize().toString());
+        {
+            Node plugin = doc.createElement("plugin");
+            {
+                Node groupId = doc.createElement("groupId");
+                groupId.setTextContent("edu.illinois.cs");
+                plugin.appendChild(groupId);
             }
-        }
+            {
+                Node artifactId = doc.createElement("artifactId");
+                artifactId.setTextContent("testrunner-maven-plugin");
+                plugin.appendChild(artifactId);
+            }
+            {
+                Node version = doc.createElement("version");
+                version.setTextContent("1.0");
+                plugin.appendChild(version);
+            }
+            {
+                Node dependencies = doc.createElement("dependencies");
+                {
+                    Node dependency = doc.createElement("dependency");
+                    {
+                        Node depGroupId = doc.createElement("groupId");
+                        depGroupId.setTextContent("edu.illinois.cs");
+                        dependency.appendChild(depGroupId);
 
-        // Invoke the pattern matching
-        // method on each file.
-        @Override
-        public FileVisitResult visitFile(Path file,
-                BasicFileAttributes attrs) {
-            find(file);
-            return CONTINUE;
-        }
+                        Node depArtifactId = doc.createElement("artifactId");
+                        depArtifactId.setTextContent(ARTIFACT_ID);
+                        dependency.appendChild(depArtifactId);
 
-        // Invoke the pattern matching
-        // method on each directory.
-        @Override
-        public FileVisitResult preVisitDirectory(Path dir,
-                BasicFileAttributes attrs) {
-            find(dir);
-            return CONTINUE;
+                        Node depVersion = doc.createElement("version");
+                        depVersion.setTextContent(ARTIFACT_VERSION);
+                        dependency.appendChild(depVersion);
+                    }
+                    dependencies.appendChild(dependency);
+                }
+                plugin.appendChild(dependencies);
+            }
+            {
+                Node configuration = doc.createElement("configuration");
+                {
+                    Node className = doc.createElement("className");
+                    className.setTextContent(CONFIGURATION_CLASS);
+                    configuration.appendChild(className);
+                }
+                plugin.appendChild(configuration);
+            }
+            plugins.appendChild(plugin);
         }
+    }
 
-        @Override
-        public FileVisitResult visitFileFailed(Path file,
-                IOException exc) {
-            System.err.println(exc);
-            return CONTINUE;
-        }
-
-        public List<String> getMatches() {
-            return this.matches;
-        }
+    private String getArtifactId() {
+        return this.artifactId;
     }
 
     public static void main(String[] args) {
@@ -452,7 +255,7 @@ public class PomFile {
 
         InputStreamReader isReader = new InputStreamReader(System.in);
         BufferedReader bufReader = new BufferedReader(isReader);
-        Map<String, PomFile> mapping = new HashMap<String, PomFile>();
+        Map<String, PomFile> mapping = new HashMap<>();
         String input;
         try {
             // First create objects out of all the pom.xml files passed in
@@ -463,33 +266,11 @@ public class PomFile {
 
             // Go through all the objects and have them rewrite themselves using information from dependencies
             for (Map.Entry<String,PomFile> entry : mapping.entrySet()) {
-                final Set<String> checkedMappings = new HashSet<>();
-
                 PomFile p = entry.getValue();
-
                 System.out.println(p.fullPath);
 
-                // Obtain information (src classes, output directories) from all of its dependencies
-                Set<String> dependency_srcs = new HashSet<String>();
-                Set<String> output_dirs = new HashSet<String>();
-                List<String> allDependencies = p.getDependencyIds();
-                while (!allDependencies.isEmpty()) {
-                    String dependency = allDependencies.remove(0);
-                    PomFile o = mapping.get(dependency);
-                    if (o != null){
-                        if (!checkedMappings.contains(o.fullPath)) {
-                            checkedMappings.add(o.fullPath);
-
-                            dependency_srcs.addAll(o.getSrcClasses());
-                            output_dirs.add(o.getFullPath() + "/" + o.getOutputDir());
-
-                            allDependencies.addAll(o.getDependencyIds());   // Get transitive dependencies
-                        }
-                    }
-                }
-
                 // Have the object rewrite itself (the pom)
-                p.rewrite(dependency_srcs, output_dirs);
+                p.rewrite();
             }
         } catch(IOException e) {
             e.printStackTrace();
