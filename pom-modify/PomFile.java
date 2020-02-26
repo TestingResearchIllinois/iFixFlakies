@@ -1,5 +1,3 @@
-package edu.illinois.cs.dt.tools.utility;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
