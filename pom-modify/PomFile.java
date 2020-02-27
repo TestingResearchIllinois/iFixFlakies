@@ -34,8 +34,8 @@ public class PomFile {
     private String srcDir;
     private String testDir;
     private String outputDir;
-    private static final String ARTIFACT_ID = "ifixflakies";
-    private static final String CONFIGURATION_CLASS = "edu.illinois.cs.dt.tools.fixer.CleanerFixerPlugin";
+    private static String ARTIFACT_ID = "ifixflakies";
+    private static String CONFIGURATION_CLASS = "edu.illinois.cs.dt.tools.fixer.CleanerFixerPlugin";
     private static String ARTIFACT_VERSION = "1.0.0-SNAPSHOT";
 
     public PomFile(String pom) {
@@ -247,9 +247,13 @@ public class PomFile {
     }
 
     public static void main(String[] args) {
-        if (args.length != 0) {
-            ARTIFACT_VERSION = args[0];
+        if (args.length != 3) {
+            System.out.println("Usage: java PomFile <artifact_id> <artifact_version> <configuration_class_name>");
         }
+
+        ARTIFACT_ID = args[0];
+        ARTIFACT_VERSION = args[1];
+        CONFIGURATION_CLASS  = args[2];
 
         InputStreamReader isReader = new InputStreamReader(System.in);
         BufferedReader bufReader = new BufferedReader(isReader);
