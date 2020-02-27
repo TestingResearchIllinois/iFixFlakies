@@ -27,7 +27,7 @@ bash pom-modify/modify-project.sh path_to_maven_project
 
 Copy the following plugin into the Maven project's pom.xml.
 You do not need to perform this step if you have already completed the instructions
-in "[Automatically setting up the pom.xml for iFixFlakies](#automatically-setting-up-the-pomxml-for-ifixflakies)".
+in [Automatically setting up the pom.xml for iFixFlakies](#automatically-setting-up-the-pomxml-for-ifixflakies).
 
 ```xml
 <build>
