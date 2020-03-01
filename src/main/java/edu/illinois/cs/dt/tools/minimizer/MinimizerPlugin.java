@@ -62,7 +62,12 @@ public class MinimizerPlugin extends TestPlugin {
             List<String> originalOrder;
             if (ORIGINAL_ORDER != null) {
                 TestPluginPlugin.info("Using specified original order. dt.minimizer.original.order argument specified: " + ORIGINAL_ORDER);
-                originalOrder = Files.readAllLines(Paths.get(ORIGINAL_ORDER));
+                Path originalOrderPath = Paths.get(ORIGINAL_ORDER);
+                originalOrder = Files.readAllLines(originalOrderPath);
+                // Copy the original order file to where we expect it to be since other parts of the tool still expects it to be there
+                // Future versions of iDFlakies should allow us to set the DetectorPathManager.originalOrderPath directly
+                Files.createDirectories(originalOrderPath.getParent());
+                Files.write(DetectorPathManager.originalOrderPath(), originalOrder);
             } else {
                 originalOrder = DetectorPlugin.getOriginalOrder(project);
             }
