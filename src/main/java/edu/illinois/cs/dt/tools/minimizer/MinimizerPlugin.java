@@ -80,8 +80,9 @@ public class MinimizerPlugin extends TestPlugin {
 
                     if (Files.exists(originalOrderPath)) {
                         String originalOrderRename = "original-order-" + System.currentTimeMillis();
-                        Files.move(originalOrderPath, originalOrderPath.resolveSibling(originalOrderRename));
-                        TestPluginPlugin.info("Original order before copying is now moved to: " + originalOrderRename);
+                        Path renamePath = originalOrderPath.resolveSibling(originalOrderRename);
+                        Files.move(originalOrderPath, renamePath);
+                        TestPluginPlugin.info("Original order before copying is now moved to: " + renamePath);
                     }
 
                     // Copy the original order file to where we expect it to be since other parts of the tool still expects it to be there
@@ -89,7 +90,8 @@ public class MinimizerPlugin extends TestPlugin {
                     Files.createDirectories(originalOrderPath.getParent());
                     Files.write(originalOrderPath, originalOrderSpecified);
 
-                    TestPluginPlugin.info("Specified original order copied to: " + originalOrderSpecified);
+                    TestPluginPlugin.info("Specified original order copied to: " + originalOrderPath);
+                    originalOrder = originalOrderSpecified;
                 }
             }
 
