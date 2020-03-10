@@ -52,13 +52,19 @@ public class MinimizerPlugin extends TestPlugin {
     }
 
     private Stream<TestMinimizer> fromDtList(Path path, MavenProject project) {
-        if (FLAKY_LIST != null) {
-            path = Paths.get(FLAKY_LIST);
-            TestPluginPlugin.info("dt.minimizer.flaky.list argument specified: " + FLAKY_LIST);
-        }
-        TestPluginPlugin.info("Creating minimizers for file: " + path);
-
         try {
+            if (FLAKY_LIST != null) {
+                List<String> contents;
+                if (Files.exists(path)) {
+                    contents = Files.readAllLines(path);
+                } else {
+                    contents = new ArrayList<String>();
+                }
+                copyFile(path, "flaky-lists.json", FLAKY_LIST, contents);
+                path = Paths.get(FLAKY_LIST);
+            }
+            TestPluginPlugin.info("Creating minimizers for file: " + path);
+
             Path originalOrderPath = DetectorPathManager.originalOrderPath();
             List<String> originalOrder;
             if (Files.exists(originalOrderPath)) {
@@ -68,31 +74,7 @@ public class MinimizerPlugin extends TestPlugin {
             }
 
             if (ORIGINAL_ORDER != null) {
-                TestPluginPlugin.info("Using specified original order. dt.minimizer.original.order argument specified: " + ORIGINAL_ORDER);
-                List<String> originalOrderSpecified = Files.readAllLines(Paths.get(ORIGINAL_ORDER));
-
-                if (originalOrderSpecified.equals(originalOrder)) {
-                    TestPluginPlugin.info("Custom original order specified and found to be matching the existing original order at: "
-                                          + originalOrderPath);
-                } else {
-                    TestPluginPlugin.info("Copying custom original order specified since it is different than the (non)existing original order at: "
-                                          + originalOrderPath);
-
-                    if (Files.exists(originalOrderPath)) {
-                        String originalOrderRename = "original-order-" + System.currentTimeMillis();
-                        Path renamePath = originalOrderPath.resolveSibling(originalOrderRename);
-                        Files.move(originalOrderPath, renamePath);
-                        TestPluginPlugin.info("Original order before copying is now moved to: " + renamePath);
-                    }
-
-                    // Copy the original order file to where we expect it to be since other parts of the tool still expects it to be there
-                    // Future versions of iDFlakies should allow us to set the DetectorPathManager.originalOrderPath directly
-                    Files.createDirectories(originalOrderPath.getParent());
-                    Files.write(originalOrderPath, originalOrderSpecified);
-
-                    TestPluginPlugin.info("Specified original order copied to: " + originalOrderPath);
-                    originalOrder = originalOrderSpecified;
-                }
+                originalOrder = copyFile(originalOrderPath, "original-order", ORIGINAL_ORDER, originalOrder);
             }
 
             if (!Files.exists(originalOrderPath) || originalOrder.isEmpty()) {
@@ -136,6 +118,36 @@ public class MinimizerPlugin extends TestPlugin {
         } catch (IOException e) {
             return Stream.empty();
         }
+    }
+
+    public List<String> copyFile(Path originalOrderPath, String filename, String ORIGINAL_ORDER, List<String> originalOrder) throws IOException {
+        TestPluginPlugin.info("Using specified " + filename + ". Argument specified: " + ORIGINAL_ORDER);
+        List<String> originalOrderSpecified = Files.readAllLines(Paths.get(ORIGINAL_ORDER));
+
+        if (originalOrderSpecified.equals(originalOrder)) {
+            TestPluginPlugin.info("Custom " + filename + " specified and found to be matching the existing " + filename + " at: "
+                                  + originalOrderPath);
+        } else {
+            TestPluginPlugin.info("Copying custom " + filename + " specified since it is different than the (non)existing " + filename + " at: "
+                                  + originalOrderPath);
+
+            if (Files.exists(originalOrderPath)) {
+                String originalOrderRename = filename + "-" + System.currentTimeMillis();
+                Path renamePath = originalOrderPath.resolveSibling(originalOrderRename);
+                Files.move(originalOrderPath, renamePath);
+                TestPluginPlugin.info(filename + " before copying is now moved to: " + renamePath);
+            }
+
+            // Copy the original order file to where we expect it to be since other parts of the tool still expects it to be there
+            // Future versions of iDFlakies should allow us to set the DetectorPathManager.originalOrderPath directly
+            Files.createDirectories(originalOrderPath.getParent());
+            Files.write(originalOrderPath, originalOrderSpecified);
+
+            TestPluginPlugin.info("Specified " + filename + " copied to: " + originalOrderPath);
+        }
+
+        return originalOrderSpecified;
+
     }
 
     public Stream<TestMinimizer> minimizers(final DependentTest dependentTest,

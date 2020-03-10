@@ -131,10 +131,6 @@ public class CleanerFixerPlugin extends TestPlugin {
             if (runnerOption.isDefined()) {
                 this.runner = InstrumentingSmartRunner.fromRunner(runnerOption.get());
 
-                if (!Files.exists(DetectorPathManager.originalOrderPath())) {
-                    Files.write(DetectorPathManager.originalOrderPath(), DetectorPlugin.getOriginalOrder(project));
-                }
-
                 startTime = System.currentTimeMillis();
 
                 // Iterate through each minimized, collecing such that unique for dependent test, combine polluters
@@ -178,14 +174,6 @@ public class CleanerFixerPlugin extends TestPlugin {
     }
 
     private Stream<MinimizeTestsResult> detect() throws Exception {
-        if (!Files.exists(DetectorPathManager.detectionFile())) {
-            if (Configuration.config().getProperty("diagnosis.run_detection", true)) {
-                new DetectorPlugin(DetectorPathManager.detectionResults(), runner).execute(project);
-            } else {
-                throw new NoSuchFileException("File " + DetectorPathManager.detectionFile() + " does not exist and diagnosis.run_detection is set to false");
-            }
-        }
-
         return new MinimizerPlugin(runner).runDependentTestFile(DetectorPathManager.detectionFile(), project);
     }
 
