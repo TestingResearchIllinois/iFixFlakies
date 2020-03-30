@@ -59,19 +59,47 @@ public class MinimizerPlugin extends TestPlugin {
         TestPluginPlugin.info("Creating minimizers for file: " + path);
 
         try {
+            Path originalOrderPath = DetectorPathManager.originalOrderPath();
             List<String> originalOrder;
-            if (ORIGINAL_ORDER != null) {
-                TestPluginPlugin.info("Using specified original order. dt.minimizer.original.order argument specified: " + ORIGINAL_ORDER);
-                originalOrder = Files.readAllLines(Paths.get(ORIGINAL_ORDER));
+            if (Files.exists(originalOrderPath)) {
+                originalOrder = Files.readAllLines(originalOrderPath);
             } else {
-                originalOrder = DetectorPlugin.getOriginalOrder(project);
+                originalOrder = new ArrayList<>();
             }
 
-            if (!Files.exists(DetectorPathManager.originalOrderPath()) || originalOrder.isEmpty()) {
+            if (ORIGINAL_ORDER != null) {
+                TestPluginPlugin.info("Using specified original order. dt.minimizer.original.order argument specified: " + ORIGINAL_ORDER);
+                List<String> originalOrderSpecified = Files.readAllLines(Paths.get(ORIGINAL_ORDER));
+
+                if (originalOrderSpecified.equals(originalOrder)) {
+                    TestPluginPlugin.info("Custom original order specified and found to be matching the existing original order at: "
+                                          + originalOrderPath);
+                } else {
+                    TestPluginPlugin.info("Copying custom original order specified since it is different than the (non)existing original order at: "
+                                          + originalOrderPath);
+
+                    if (Files.exists(originalOrderPath)) {
+                        String originalOrderRename = "original-order-" + System.currentTimeMillis();
+                        Path renamePath = originalOrderPath.resolveSibling(originalOrderRename);
+                        Files.move(originalOrderPath, renamePath);
+                        TestPluginPlugin.info("Original order before copying is now moved to: " + renamePath);
+                    }
+
+                    // Copy the original order file to where we expect it to be since other parts of the tool still expects it to be there
+                    // Future versions of iDFlakies should allow us to set the DetectorPathManager.originalOrderPath directly
+                    Files.createDirectories(originalOrderPath.getParent());
+                    Files.write(originalOrderPath, originalOrderSpecified);
+
+                    TestPluginPlugin.info("Specified original order copied to: " + originalOrderPath);
+                    originalOrder = originalOrderSpecified;
+                }
+            }
+
+            if (!Files.exists(originalOrderPath) || originalOrder.isEmpty()) {
                 TestPluginPlugin.info("Original order file not found or is empty. Creating original-order file now at: "
-                                      + DetectorPathManager.originalOrderPath());
+                                      + originalOrderPath);
                 originalOrder = DetectorPlugin.getOriginalOrder(project, true);
-                Files.write(DetectorPathManager.originalOrderPath(), originalOrder);
+                Files.write(originalOrderPath, originalOrder);
             }
 
             DependentTestList dependentTestList = DependentTestList.fromFile(path);
