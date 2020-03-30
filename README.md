@@ -3,6 +3,8 @@
 This plugin automatically generates patches for order-dependent tests by finding and utilizing helper test methods in the test suite.
 This plugin builds upon code from iDFlakies (https://github.com/idflakies/iDFlakies), and relies on detected order-dependent tests that iDFlakies finds.
 
+More details about iFixFlakies can be found in its [paper](http://mir.cs.illinois.edu/awshi2/publications/FSE2019.pdf) and [website](https://sites.google.com/view/ifixflakies).
+
 # Quickstart
 
 First, follow the instructions for iDFlakies to detect order-dependent tests and obtain passing and failing orders for them.
