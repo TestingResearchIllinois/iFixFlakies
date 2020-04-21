@@ -59,6 +59,10 @@ public class MinimizerPlugin extends TestPlugin {
         TestPluginPlugin.info("Creating minimizers for file: " + path);
 
         try {
+            if (!Files.exists(DetectorPathManager.cachePath())) {
+                Files.createDirectories(DetectorPathManager.cachePath());
+            }
+
             Path originalOrderPath = DetectorPathManager.originalOrderPath();
             List<String> originalOrder;
             if (Files.exists(originalOrderPath)) {
@@ -87,7 +91,6 @@ public class MinimizerPlugin extends TestPlugin {
 
                     // Copy the original order file to where we expect it to be since other parts of the tool still expects it to be there
                     // Future versions of iDFlakies should allow us to set the DetectorPathManager.originalOrderPath directly
-                    Files.createDirectories(originalOrderPath.getParent());
                     Files.write(originalOrderPath, originalOrderSpecified);
 
                     TestPluginPlugin.info("Specified original order copied to: " + originalOrderPath);

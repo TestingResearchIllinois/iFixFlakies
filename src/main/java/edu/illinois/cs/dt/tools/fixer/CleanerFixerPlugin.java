@@ -128,6 +128,9 @@ public class CleanerFixerPlugin extends TestPlugin {
         System.out.println("DIAGNOSER_MODULE_COORDINATES: " + logger.coordinates());
 
         logger.runAndLogError(() -> {
+            if (!Files.exists(DetectorPathManager.cachePath())) {
+                Files.createDirectories(DetectorPathManager.cachePath());
+            }
             if (runnerOption.isDefined()) {
                 this.runner = InstrumentingSmartRunner.fromRunner(runnerOption.get());
 
