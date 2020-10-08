@@ -80,7 +80,12 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
     }
 
     private Result result(final List<String> order) {
-        return runResult(order).results().get(dependentTest).result();
+        try {
+            return runResult(order).results().get(dependentTest).result();
+        } catch (java.lang.IllegalThreadStateException e) {
+             // indicates timeout
+            return Result.SKIPPED;
+        }
     }
 
     public MinimizeTestsResult run() throws Exception {
