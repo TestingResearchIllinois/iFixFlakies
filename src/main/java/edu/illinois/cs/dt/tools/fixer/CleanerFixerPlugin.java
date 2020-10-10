@@ -134,7 +134,7 @@ public class CleanerFixerPlugin extends TestPlugin {
             if (runnerOption.isDefined()) {
                 this.runner = InstrumentingSmartRunner.fromRunner(runnerOption.get());
 
-                if (!Files.exists(DetectorPathManager.originalOrderPath())) {
+                if (!Files.exists(DetectorPathManager.originalOrderPath()) && MinimizerPlugin.ORIGINAL_ORDER == null) {
                     Files.write(DetectorPathManager.originalOrderPath(), DetectorPlugin.getOriginalOrder(project));
                 }
 
@@ -184,7 +184,7 @@ public class CleanerFixerPlugin extends TestPlugin {
         if (!Files.exists(DetectorPathManager.detectionFile())) {
             if (Configuration.config().getProperty("diagnosis.run_detection", true)) {
                 new DetectorPlugin(DetectorPathManager.detectionResults(), runner).execute(project);
-            } else {
+            } else if (MinimizerPlugin.FLAKY_LIST == null) {
                 throw new NoSuchFileException("File " + DetectorPathManager.detectionFile() + " does not exist and diagnosis.run_detection is set to false");
             }
         }
