@@ -161,11 +161,11 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
             }
 
             polluters.add(new PolluterData(operationTime[0], index, deps, cleanerData));
-	    
-	    // If not configured to find all, since one is found now, can stop looking
-	    if (!FIND_ALL) {
-		break;
-	    }
+  
+            // If not configured to find all, since one is found now, can stop looking
+            if (!FIND_ALL) {
+                break;
+            }
 
             // A better implementation would remove one by one and not assume polluter groups are mutually exclusive
             order.removeAll(deps);  // Look for other deps besides the ones already found
