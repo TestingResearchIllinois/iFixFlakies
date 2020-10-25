@@ -206,54 +206,8 @@ public class CleanerFinder {
     private CleanerGroup minimalCleanerGroup(final int i, final ListEx<String> cleanerGroup) {
         TestPluginPlugin.info("Minimizing cleaner group " + i + ": " +
                 StringUtils.abbreviate(String.valueOf(cleanerGroup), 500));
-        return new CleanerGroup(dependentTest, cleanerGroup.size(), deltaDebug(cleanerGroup, 2), i);
-    }
-
-    /**
-     * @param cleanerGroup The list of tests that is a known, but not necessarily yet a minimal, cleaner group
-     * @param n The granularity level at which to chunk up the tests and try to minimize
-     * @return A minimal cleanerGroup obtained using delta-debugging
-     */
-    private ListEx<String> deltaDebug(final ListEx<String> cleanerGroup, int n) {
-        // If n granularity is greater than number of tests, then finished, simply return passed in tests
-        if (cleanerGroup.size() < n) {
-            return cleanerGroup;
-        }
-
-        // Cut the tests into n equal chunks and try each chunk
-        int chunkSize = (int)Math.round((double)(cleanerGroup.size()) / n);
-        List<ListEx<String>> chunks = new ArrayList<>();
-        for (int i = 0; i < cleanerGroup.size(); i += chunkSize) {
-            ListEx<String> chunk = new ListEx<>();
-            ListEx<String> otherChunk = new ListEx<>();
-            // Create chunk starting at this iteration
-            int endpoint = Math.min(cleanerGroup.size(), i + chunkSize);
-            chunk.addAll(cleanerGroup.subList(i, endpoint));
-
-            // Complement chunk are tests before and after this current chunk
-            otherChunk.addAll(cleanerGroup.subList(0, i));
-            otherChunk.addAll(cleanerGroup.subList(endpoint, cleanerGroup.size()));
-
-            // Check if running this chunk works
-            if (isCleanerGroup(chunk)) {
-                return deltaDebug(chunk, 2); // If works, then delta debug some more this chunk
-            }
-            // Otherwise, check if applying complement chunk works
-            if (isCleanerGroup(otherChunk)) {
-                return deltaDebug(otherChunk, 2);   // If works, then delta debug some more the complement chunk
-            }
-        }
-        // If size is equal to number of ochunks, we are finished, cannot go down more
-        if (cleanerGroup.size() == n) {
-            return cleanerGroup;
-        }
-
-        // If not chunk/complement work, increase granularity and try again
-        if (cleanerGroup.size() < n * 2) {
-            return deltaDebug(cleanerGroup, cleanerGroup.size());
-        } else {
-            return deltaDebug(cleanerGroup, n * 2);
-        }
+        CleanerGroupDeltaDebugger debugger = new CleanerGroupDeltaDebugger(this.runner, this.dependentTest, this.deps, this.isolationResult);
+        return new CleanerGroup(dependentTest, cleanerGroup.size(), new ListEx<>(debugger.deltaDebug(cleanerGroup, 2)), i);
     }
 
     /**
