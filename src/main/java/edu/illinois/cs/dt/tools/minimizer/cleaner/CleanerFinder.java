@@ -256,55 +256,6 @@ public class CleanerFinder {
         }
     }
 
-    private ListEx<String> reduce(final ListEx<String> cleanerGroup) {
-        final ListEx<String> binaryReduced = binaryReduce(cleanerGroup);
-
-        TestPluginPlugin.debug("Reduced group " + cleanerGroup + " to " + binaryReduced);
-
-        if (binaryReduced.size() > 1) {
-            return sequentialReduce(binaryReduced);
-        } else {
-            return binaryReduced;
-        }
-    }
-
-    private ListEx<String> sequentialReduce(final ListEx<String> reduced) {
-        final ListEx<String> result = new ListEx<>(reduced);
-
-        int i = 0;
-        while (result.size() > 1 && i < result.size()) {
-            final String testName = result.remove(i);
-
-            // If it's not a cleaner group without this test, then we have to put it back
-            // otherwise, we can just keep removing
-            if (!isCleanerGroup(result)) {
-                result.add(i, testName);
-                i++;
-            }
-        }
-
-        return result;
-    }
-
-    private ListEx<String> binaryReduce(final ListEx<String> cleanerGroup) {
-        TestPluginPlugin.debug("Reducing: " + cleanerGroup);
-
-        if (cleanerGroup.size() <= 1) {
-            return cleanerGroup;
-        }
-
-        if (isCleanerGroup(cleanerGroup.topHalf())) {
-            TestPluginPlugin.debug("Taking top half: " + cleanerGroup.topHalf());
-            return binaryReduce(cleanerGroup.topHalf());
-        } else if (isCleanerGroup(cleanerGroup.botHalf())) {
-            TestPluginPlugin.debug("Taking bot half: " + cleanerGroup.botHalf());
-            return binaryReduce(cleanerGroup.botHalf());
-        } else {
-            TestPluginPlugin.debug("Done: " + cleanerGroup);
-            return cleanerGroup;
-        }
-    }
-
     /**
      * @return The lists of tests which could possibly be a cleaner group, with groups that are more likely to be cleaners coming first
      *         A cleaner group is considered "better" if they come between the polluter(s)
