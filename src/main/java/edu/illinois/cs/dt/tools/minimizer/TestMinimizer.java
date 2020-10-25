@@ -187,47 +187,6 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
         return singleTests;
     }
 
-    private List<String> deltaDebug(final List<String> deps, int n) throws Exception {
-        // If n granularity is greater than number of tests, then finished, simply return passed in tests
-        if (deps.size() < n) {
-            return deps;
-        }
-
-        // Cut the tests into n equal chunks and try each chunk
-        int chunkSize = (int)Math.round((double)(deps.size()) / n);
-        List<List<String>> chunks = new ArrayList<>();
-        for (int i = 0; i < deps.size(); i += chunkSize) {
-            List<String> chunk = new ArrayList<>();
-            List<String> otherChunk = new ArrayList<>();
-            // Create chunk starting at this iteration
-            int endpoint = Math.min(deps.size(), i + chunkSize);
-            chunk.addAll(deps.subList(i, endpoint));
-
-            // Complement chunk are tests before and after this current chunk
-            otherChunk.addAll(deps.subList(0, i));
-            otherChunk.addAll(deps.subList(endpoint, deps.size()));
-
-            // Try to other, complement chunk first, with theory that polluter is close to victim
-            if (this.expected == result(otherChunk)) {
-                return deltaDebug(otherChunk, 2);   // If works, then delta debug some more the complement chunk
-            }
-            // Check if running this chunk works
-            if (this.expected == result(chunk)) {
-                return deltaDebug(chunk, 2); // If works, then delta debug some more this chunk
-            }
-        }
-        // If size is equal to number of ochunks, we are finished, cannot go down more
-        if (deps.size() == n) {
-            return deps;
-        }
-        // If not chunk/complement work, increase granularity and try again
-        if (deps.size() < n * 2) {
-            return deltaDebug(deps, deps.size());
-        } else {
-            return deltaDebug(deps, n * 2);
-        }
-    }
-
     private List<String> run(List<String> order) throws Exception {
         final List<String> deps = new ArrayList<>();
 
@@ -236,7 +195,8 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
             return deps;
         }
 
-        deps.addAll(deltaDebug(order, 2));
+        TestMinimizerDeltaDebugger debugger = new TestMinimizerDeltaDebugger(this.runner, this.dependentTest, this.expected);
+        deps.addAll(debugger.deltaDebug(order, 2));
 
         return deps;
     }
