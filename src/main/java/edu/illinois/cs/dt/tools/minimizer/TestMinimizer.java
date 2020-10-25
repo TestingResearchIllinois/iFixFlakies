@@ -241,52 +241,6 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
         return deps;
     }
 
-    private boolean tryIsolated(final List<String> deps, final List<String> order) {
-        if (isolationResult.equals(expected)) {
-            deps.clear();
-            debug("Test has expected result in isolation.");
-            return true;
-        }
-
-        for (int i = 0; i < order.size(); i++) {
-            String test = order.get(i);
-
-            debug("Running test " + i + " of " + order.size() + ". ");
-            final Result r = result(Collections.singletonList(test));
-
-            // Found an order where we get the expected result with just one test, can't be more
-            // minimal than this.
-            if (r == expected) {
-                debug("Found dependency: " + test);
-                deps.add(test);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private List<String> runSequential(final List<String> deps, final List<String> testOrder) {
-        final List<String> remainingTests = new ArrayList<>(testOrder);
-
-        while (!remainingTests.isEmpty()) {
-            debug(String.format("Running sequentially, %d tests left", remainingTests.size()));
-            final String current = remainingTests.remove(0);
-
-            final List<String> order = Util.prependAll(deps, remainingTests);
-            final Result r = result(order);
-
-            if (r != expected) {
-                debug("Found dependency: " + current);
-                deps.add(current);
-            }
-        }
-
-        debug("Found " + deps.size() + " dependencies.");
-
-        return deps;
-    }
-
     public String getDependentTest() {
         return dependentTest;
     }
