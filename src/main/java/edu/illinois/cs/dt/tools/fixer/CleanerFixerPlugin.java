@@ -73,9 +73,6 @@ public class CleanerFixerPlugin extends TestPlugin {
     private long startTime;
     private boolean foundFirst;
 
-    // Some fields to help with counting iterations of delta debug
-    private int iterations;
-
     // Don't delete. Need a default constructor for TestPlugin
     public CleanerFixerPlugin() {
     }
@@ -853,7 +850,6 @@ public class CleanerFixerPlugin extends TestPlugin {
         // Minimizing cleaner code, which includes setup and teardown
         TestPluginPlugin.info("Going to modify " + methodToModify.methodName() + " to make failing order pass.");
         final List<OperationTime> elapsedTime = new ArrayList<>();
-        this.iterations = 0;
         int originalsize = statementsSize(cleanerStmts);
         final CleanerFixerDeltaDebugger finalDebugger = new CleanerFixerDeltaDebugger(this.project, this.runner, finalHelperMethod, failingOrder, finalPrepend);
         final NodeList<Statement> minimalCleanerStmts = OperationTime.runOperation(() -> {
@@ -915,6 +911,8 @@ public class CleanerFixerPlugin extends TestPlugin {
             return finalCleanerStmts;
         });
 
+        int iterations = finalDebugger.getIterations();
+
         BlockStmt patchedBlock = new BlockStmt(minimalCleanerStmts);
 
         // Check that the results are valid
@@ -924,7 +922,7 @@ public class CleanerFixerPlugin extends TestPlugin {
             restore(finalHelperMethod.javaFile());
             MvnCommands.runMvnInstall(this.project, false);
             Path patch = writePatch(victimMethod, 0, patchedBlock, originalsize, methodToModify, cleanerMethod, polluterMethod, elapsedTime.get(0).elapsedSeconds(), "BROKEN MINIMAL");
-            return new PatchResult(elapsedTime.get(0), FixStatus.FIX_INVALID, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), this.iterations, patch.toString());
+            return new PatchResult(elapsedTime.get(0), FixStatus.FIX_INVALID, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), iterations, patch.toString());
         }
 
         // Try to inline these statements into the method
@@ -987,7 +985,7 @@ public class CleanerFixerPlugin extends TestPlugin {
         // Final compile to get state to right place
         MvnCommands.runMvnInstall(this.project, false);
 
-        return new PatchResult(elapsedTime.get(0), fixStatus, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), this.iterations, patchFile.toString());
+        return new PatchResult(elapsedTime.get(0), fixStatus, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), iterations, patchFile.toString());
     }
 
     // Helper method to create a patch file adding in the passed in block
