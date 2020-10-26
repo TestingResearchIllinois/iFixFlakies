@@ -6,8 +6,12 @@ import java.util.List;
 // Utility class for handling general delta debugging
 public abstract class DeltaDebugger<T> {
 
+    protected int iterations;   // Keep track of number of iterations the delta debugging went through
+
     // Core logic for delta debugging, generalized to elements
     public List<T> deltaDebug(final List<T> elements, int n) {
+        this.iterations++;
+
         // If n granularity is greater than number of tests, then finished, simply return passed in tests
         if (elements.size() < n) {
             return elements;
@@ -46,6 +50,11 @@ public abstract class DeltaDebugger<T> {
         } else {
             return deltaDebug(elements, n * 2);
         }
+    }
+
+    // Getter method for number of iterations
+    public int getIterations() {
+        return this.iterations;
     }
 
     // Method to check if chunks during delta debugging is valid, to be overwritten by subclasses for specific delta debugging tasks
