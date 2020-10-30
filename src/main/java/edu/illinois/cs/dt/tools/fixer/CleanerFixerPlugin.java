@@ -653,61 +653,72 @@ public class CleanerFixerPlugin extends TestPlugin {
     }
 
     private FixStatus checkCleanerRemoval(List<String> failingOrder, JavaMethod cleanerMethod, NodeList<Statement> cleanerStmts) throws Exception {
-        // Try to modify the cleanerMethod to remove the cleaner statements
-        NodeList<Statement> allStatements = cleanerMethod.body().getStatements();
-        NodeList<Statement> strippedStatements = NodeList.nodeList();
-        NodeList<Statement> otherCleanerStmts = NodeList.nodeList(cleanerStmts);
-        int j = 0;
-        for (int i = 0; i < allStatements.size(); i++) {
-            // Do not include the statement if we see it from the cleaner statements
-            if (otherCleanerStmts.contains(allStatements.get(i))) {
-                otherCleanerStmts.remove(allStatements.get(i));
-            } else {
-                strippedStatements.add(allStatements.get(i));
-            }
-        }
-
-        // If the stripped statements is still the same as all statements, then the cleaner statements must all be in @Before/After
-        if (strippedStatements.equals(allStatements)) {
-            TestPluginPlugin.info("All cleaner statements must be in setup/teardown.");
-            return FixStatus.FIX_INLINE_SETUPTEARDOWN;  // Indicating statements were in setup/teardown
-        }
-
-        // Set the cleaner method body to be the stripped version
-        restore(cleanerMethod.javaFile());
-        cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
-        cleanerMethod.method().setBody(new BlockStmt(strippedStatements));
-        cleanerMethod.javaFile().writeAndReloadCompilationUnit();
         try {
-            MvnCommands.runMvnInstall(this.project, false);
-        } catch (Exception ex) {
-            TestPluginPlugin.debug("Error building the code after stripping statements, does not compile");
-            // Restore the state
-            restore(cleanerMethod.javaFile());
-            return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
-        }
-        // First try running in isolation
-        List<String> isolationOrder = Collections.singletonList(cleanerMethod.methodName());
-        if (!testOrderPasses(isolationOrder)) {
-            TestPluginPlugin.info("Running cleaner by itself after removing statements does not pass.");
-            // Restore the state
-            restore(cleanerMethod.javaFile());
-            return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
-        }
-        // Then try running with the failing order, replacing the last test with this one
-        List<String> newFailingOrder = new ArrayList<>(failingOrder);
-        newFailingOrder.remove(newFailingOrder.size() - 1);
-        newFailingOrder.add(cleanerMethod.methodName());
-        if (testOrderPasses(newFailingOrder)) {
-            TestPluginPlugin.info("Running cleaner in failing order after polluter still passes.");
-            // Restore the state
-            restore(cleanerMethod.javaFile());
-            return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
-        }
+            // Try to modify the cleanerMethod to remove the cleaner statements
+            NodeList<Statement> allStatements = cleanerMethod.body().getStatements();
+            NodeList<Statement> strippedStatements = NodeList.nodeList();
+            NodeList<Statement> otherCleanerStmts = NodeList.nodeList(cleanerStmts);
+            int j = 0;
+            for (int i = 0; i < allStatements.size(); i++) {
+                // Do not include the statement if we see it from the cleaner statements
+                if (otherCleanerStmts.contains(allStatements.get(i))) {
+                    otherCleanerStmts.remove(allStatements.get(i));
+                } else {
+                    strippedStatements.add(allStatements.get(i));
+                }
+            }
 
-        // Restore the state
-        restore(cleanerMethod.javaFile());
-        return FixStatus.FIX_INLINE_CANREMOVE;  // Indicating statements can be removed
+            // If the stripped statements is still the same as all statements, then the cleaner statements must all be in @Before/After
+            if (strippedStatements.equals(allStatements)) {
+                TestPluginPlugin.info("All cleaner statements must be in setup/teardown.");
+                return FixStatus.FIX_INLINE_SETUPTEARDOWN;  // Indicating statements were in setup/teardown
+            }
+
+            // Set the cleaner method body to be the stripped version
+            restore(cleanerMethod.javaFile());
+            cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+            cleanerMethod.method().setBody(new BlockStmt(strippedStatements));
+            cleanerMethod.javaFile().writeAndReloadCompilationUnit();
+            try {
+                MvnCommands.runMvnInstall(this.project, false);
+            } catch (Exception ex) {
+                TestPluginPlugin.debug("Error building the code after stripping statements, does not compile");
+                //// Restore the state
+                //restore(cleanerMethod.javaFile());
+                //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+                return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
+            }
+            // First try running in isolation
+            List<String> isolationOrder = Collections.singletonList(cleanerMethod.methodName());
+            if (!testOrderPasses(isolationOrder)) {
+                TestPluginPlugin.info("Running cleaner by itself after removing statements does not pass.");
+                //// Restore the state
+                //restore(cleanerMethod.javaFile());
+                //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+                return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
+            }
+            // Then try running with the failing order, replacing the last test with this one
+            List<String> newFailingOrder = new ArrayList<>(failingOrder);
+            newFailingOrder.remove(newFailingOrder.size() - 1);
+            newFailingOrder.add(cleanerMethod.methodName());
+            if (testOrderPasses(newFailingOrder)) {
+                TestPluginPlugin.info("Running cleaner in failing order after polluter still passes.");
+                //// Restore the state
+                //restore(cleanerMethod.javaFile());
+                //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+                return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
+            }
+
+            //// Restore the state
+            //restore(cleanerMethod.javaFile());
+            //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+            return FixStatus.FIX_INLINE_CANREMOVE;  // Indicating statements can be removed
+        } finally {
+            // Restore the state
+            restore(cleanerMethod.javaFile());
+            cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+            MvnCommands.runMvnInstall(this.project, true);
+        }
     }
 
     // Make the cleaner statements based on the cleaner method and what method needs to be modified in the process
