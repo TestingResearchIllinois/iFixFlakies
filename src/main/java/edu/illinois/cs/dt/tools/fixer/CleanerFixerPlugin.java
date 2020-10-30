@@ -871,16 +871,9 @@ public class CleanerFixerPlugin extends TestPlugin {
                 currentInterCleanerStmts = NodeList.nodeList(interCleanerStmts);
                 interCleanerStmts = NodeList.nodeList();
                 interCleanerStmts.addAll(finalDebugger.deltaDebug(currentInterCleanerStmts, 2));
-                // Try to go through each statement and look to see if can delta debug a try statement more
-                for (int i = 0; i < interCleanerStmts.size(); i++) {
-                    if (interCleanerStmts.get(i) instanceof TryStmt) {
-                        TryStmt tryStmt = (TryStmt)interCleanerStmts.get(i);
-                        CleanerFixerBlockDeltaDebugger internalDebugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, finalHelperMethod, failingOrder, finalPrepend, tryStmt.getTryBlock(), interCleanerStmts);
-                        NodeList<Statement> stmts = NodeList.nodeList();
-                        stmts.addAll(internalDebugger.deltaDebug(tryStmt.getTryBlock().getStatements(), 2));
-                        tryStmt.getTryBlock().setStatements(stmts);
-                    }
-                }
+
+                // Debug each statement further if they contain blocks, so debug within statements in that block(s)
+                interCleanerStmts = debugFurther(interCleanerStmts, finalHelperMethod, failingOrder, finalPrepend, interCleanerStmts);
 
                 // "Unravel" any blocks and potentially debug some more
                 NodeList<Statement> unraveledCleanerStmts = NodeList.nodeList();
@@ -997,6 +990,80 @@ public class CleanerFixerPlugin extends TestPlugin {
         MvnCommands.runMvnInstall(this.project, false);
 
         return new PatchResult(elapsedTime.get(0), fixStatus, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), iterations, patchFile.toString());
+    }
+
+    // Debug list of statements even further, if any statement contains blocks
+    private NodeList<Statement> debugFurther(NodeList<Statement> stmts, JavaMethod helperMethod,
+                                             List<String> failingOrder, boolean prepend, NodeList<Statement> stmtsToRun) {
+        CleanerFixerBlockDeltaDebugger debugger;
+
+        // Iterate through all statements and try to debug further if contain block
+        for (int i = 0; i < stmts.size(); i++) {
+            Statement stmt = stmts.get(i);
+
+            if (stmt instanceof BlockStmt) {
+                BlockStmt blockStmt = (BlockStmt)stmt;
+
+                debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, blockStmt, stmtsToRun);
+                NodeList<Statement> minimalBlockStmts = NodeList.nodeList();
+                minimalBlockStmts.addAll(debugger.deltaDebug(blockStmt.getStatements(), 2));
+                blockStmt.setStatements(minimalBlockStmts);
+
+                // Debug further nested blocks
+                minimalBlockStmts = debugFurther(minimalBlockStmts, helperMethod, failingOrder, prepend, stmtsToRun);
+                blockStmt.setStatements(minimalBlockStmts);
+            } else if (stmt instanceof TryStmt) {
+                TryStmt tryStmt = (TryStmt)stmt;
+
+                // Do the try block part
+                debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, tryStmt.getTryBlock(), stmtsToRun);
+                NodeList<Statement> minimalBlockStmts = NodeList.nodeList();
+                minimalBlockStmts.addAll(debugger.deltaDebug(tryStmt.getTryBlock().getStatements(), 2));
+                tryStmt.setTryBlock(new BlockStmt(minimalBlockStmts));
+
+                // Debug further nested blocks
+                minimalBlockStmts = debugFurther(minimalBlockStmts, helperMethod, failingOrder, prepend, stmtsToRun);
+                tryStmt.setTryBlock(new BlockStmt(minimalBlockStmts));
+
+                // If has finally block, do that
+                if (tryStmt.getFinallyBlock().isPresent()) {
+                    debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, tryStmt.getFinallyBlock().get(), stmtsToRun);
+                    minimalBlockStmts = NodeList.nodeList();
+                    minimalBlockStmts.addAll(debugger.deltaDebug(tryStmt.getFinallyBlock().get().getStatements(), 2));
+                    tryStmt.setFinallyBlock(new BlockStmt(minimalBlockStmts));
+
+                    // Debug further nested blocks
+                    minimalBlockStmts = debugFurther(minimalBlockStmts, helperMethod, failingOrder, prepend, stmtsToRun);
+                    tryStmt.setFinallyBlock(new BlockStmt(minimalBlockStmts));
+
+                    // If the finally block is empty, remove
+                    if (minimalBlockStmts.isEmpty()) {
+                        tryStmt.removeFinallyBlock();
+                    }
+                }
+
+                // Special case for try: see if we can remove the try and change just to a normal block
+                // This can happen if minimized enough statements as to remove the ones that actually throw exceptions
+                if (!tryStmt.getFinallyBlock().isPresent()) {   // For now, only do if finally block is not there
+                    BlockStmt blockStmt = new BlockStmt();
+                    blockStmt.setStatements(tryStmt.getTryBlock().getStatements());
+
+                    // Manipulate list to add this block at that location and remove the try that got shifted next
+                    stmts.add(i, blockStmt);
+                    stmts.remove(i + 1);
+
+                    // Use debugger to just check if things work with this block instead of try
+                    debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, blockStmt, stmtsToRun);
+                    if (!debugger.checkValid(blockStmt.getStatements())) {
+                        // If invalid, we should set the try statement back in
+                        stmts.add(i, tryStmt);
+                        stmts.remove(i + 1);
+                    }
+                }
+            }
+        }
+
+        return stmts;
     }
 
     // Helper method to create a patch file adding in the passed in block
