@@ -33,10 +33,10 @@ public class MinimizerPlugin extends TestPlugin {
     private InstrumentingSmartRunner runner;
     private final String TEST_TO_MINIMIZE = Configuration.config().getProperty("dt.minimizer.dependent.test", null);
     private final boolean GENERATE_FLAKIES = Configuration.config().getProperty("dt.minimizer.generate.list.flakies", false);
-    private final boolean USE_ORIGINAL_ORDER = Configuration.config().getProperty("dt.minimizer.use.original.order", false);
+    public static final boolean USE_ORIGINAL_ORDER = Configuration.config().getProperty("dt.minimizer.use.original.order", false);
     private static final boolean VERIFY_DTS = Configuration.config().getProperty("dt.verify", true);
-    private final String FLAKY_LIST = Configuration.config().getProperty("dt.minimizer.flaky.list", null);
-    private final String ORIGINAL_ORDER = Configuration.config().getProperty("dt.minimizer.original.order", null);
+    public static final String FLAKY_LIST = Configuration.config().getProperty("dt.minimizer.flaky.list", null);
+    public static final String ORIGINAL_ORDER = Configuration.config().getProperty("dt.minimizer.original.order", null);
 
     /**
      * This will clear all the cached test runs!
@@ -59,6 +59,10 @@ public class MinimizerPlugin extends TestPlugin {
         TestPluginPlugin.info("Creating minimizers for file: " + path);
 
         try {
+            if (!Files.exists(DetectorPathManager.cachePath())) {
+                Files.createDirectories(DetectorPathManager.cachePath());
+            }
+
             Path originalOrderPath = DetectorPathManager.originalOrderPath();
             List<String> originalOrder;
             if (Files.exists(originalOrderPath)) {
@@ -87,7 +91,6 @@ public class MinimizerPlugin extends TestPlugin {
 
                     // Copy the original order file to where we expect it to be since other parts of the tool still expects it to be there
                     // Future versions of iDFlakies should allow us to set the DetectorPathManager.originalOrderPath directly
-                    Files.createDirectories(originalOrderPath.getParent());
                     Files.write(originalOrderPath, originalOrderSpecified);
 
                     TestPluginPlugin.info("Specified original order copied to: " + originalOrderPath);

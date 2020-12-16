@@ -80,7 +80,12 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
     }
 
     private Result result(final List<String> order) {
-        return runResult(order).results().get(dependentTest).result();
+        try {
+            return runResult(order).results().get(dependentTest).result();
+        } catch (java.lang.IllegalThreadStateException e) {
+             // indicates timeout
+            return Result.SKIPPED;
+        }
     }
 
     public MinimizeTestsResult run() throws Exception {
@@ -156,11 +161,11 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
             }
 
             polluters.add(new PolluterData(operationTime[0], index, deps, cleanerData));
-	    
-	    // If not configured to find all, since one is found now, can stop looking
-	    if (!FIND_ALL) {
-		break;
-	    }
+  
+            // If not configured to find all, since one is found now, can stop looking
+            if (!FIND_ALL) {
+                break;
+            }
 
             // A better implementation would remove one by one and not assume polluter groups are mutually exclusive
             order.removeAll(deps);  // Look for other deps besides the ones already found
@@ -182,47 +187,6 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
         return singleTests;
     }
 
-    private List<String> deltaDebug(final List<String> deps, int n) throws Exception {
-        // If n granularity is greater than number of tests, then finished, simply return passed in tests
-        if (deps.size() < n) {
-            return deps;
-        }
-
-        // Cut the tests into n equal chunks and try each chunk
-        int chunkSize = (int)Math.round((double)(deps.size()) / n);
-        List<List<String>> chunks = new ArrayList<>();
-        for (int i = 0; i < deps.size(); i += chunkSize) {
-            List<String> chunk = new ArrayList<>();
-            List<String> otherChunk = new ArrayList<>();
-            // Create chunk starting at this iteration
-            int endpoint = Math.min(deps.size(), i + chunkSize);
-            chunk.addAll(deps.subList(i, endpoint));
-
-            // Complement chunk are tests before and after this current chunk
-            otherChunk.addAll(deps.subList(0, i));
-            otherChunk.addAll(deps.subList(endpoint, deps.size()));
-
-            // Try to other, complement chunk first, with theory that polluter is close to victim
-            if (this.expected == result(otherChunk)) {
-                return deltaDebug(otherChunk, 2);   // If works, then delta debug some more the complement chunk
-            }
-            // Check if running this chunk works
-            if (this.expected == result(chunk)) {
-                return deltaDebug(chunk, 2); // If works, then delta debug some more this chunk
-            }
-        }
-        // If size is equal to number of ochunks, we are finished, cannot go down more
-        if (deps.size() == n) {
-            return deps;
-        }
-        // If not chunk/complement work, increase granularity and try again
-        if (deps.size() < n * 2) {
-            return deltaDebug(deps, deps.size());
-        } else {
-            return deltaDebug(deps, n * 2);
-        }
-    }
-
     private List<String> run(List<String> order) throws Exception {
         final List<String> deps = new ArrayList<>();
 
@@ -231,53 +195,8 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
             return deps;
         }
 
-        deps.addAll(deltaDebug(order, 2));
-
-        return deps;
-    }
-
-    private boolean tryIsolated(final List<String> deps, final List<String> order) {
-        if (isolationResult.equals(expected)) {
-            deps.clear();
-            debug("Test has expected result in isolation.");
-            return true;
-        }
-
-        for (int i = 0; i < order.size(); i++) {
-            String test = order.get(i);
-
-            debug("Running test " + i + " of " + order.size() + ". ");
-            final Result r = result(Collections.singletonList(test));
-
-            // Found an order where we get the expected result with just one test, can't be more
-            // minimal than this.
-            if (r == expected) {
-                debug("Found dependency: " + test);
-                deps.add(test);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private List<String> runSequential(final List<String> deps, final List<String> testOrder) {
-        final List<String> remainingTests = new ArrayList<>(testOrder);
-
-        while (!remainingTests.isEmpty()) {
-            debug(String.format("Running sequentially, %d tests left", remainingTests.size()));
-            final String current = remainingTests.remove(0);
-
-            final List<String> order = Util.prependAll(deps, remainingTests);
-            final Result r = result(order);
-
-            if (r != expected) {
-                debug("Found dependency: " + current);
-                deps.add(current);
-            }
-        }
-
-        debug("Found " + deps.size() + " dependencies.");
+        TestMinimizerDeltaDebugger debugger = new TestMinimizerDeltaDebugger(this.runner, this.dependentTest, this.expected);
+        deps.addAll(debugger.deltaDebug(order, 2));
 
         return deps;
     }
