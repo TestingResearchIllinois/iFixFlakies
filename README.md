@@ -3,6 +3,8 @@
 This plugin automatically generates patches for order-dependent tests by finding and utilizing helper test methods in the test suite.
 This plugin builds upon code from iDFlakies (https://github.com/idflakies/iDFlakies), and relies on detected order-dependent tests that iDFlakies finds.
 
+More details about iFixFlakies can be found in its [paper](http://mir.cs.illinois.edu/awshi2/publications/FSE2019.pdf) and [website](https://sites.google.com/view/ifixflakies).
+
 # Quickstart
 
 First, follow the instructions for iDFlakies to detect order-dependent tests and obtain passing and failing orders for them.
@@ -13,7 +15,7 @@ After building the iFixFlakies plugin, you will then need to add it to the Maven
 (If you had modified the pom.xml to run iDFlakies, you will notice the two modifications are quite similar.
 You will need to change the existing modification for iDFlakies to be like this modification for iFixFlakies.)
 
-## Automatically setting up the pom.xml for iFixFlakies 
+## Automatically setting up the pom.xml for iFixFlakies
 
 Run the following command to automatically setup the pom.xml for iFixFlakies. Note that if you made changes to the pom.xml
 for iDFlakies you will first need to remove those changes before you run the following command.
@@ -26,6 +28,8 @@ bash pom-modify/modify-project.sh path_to_maven_project
 ## Manually setting up the pom.xml for iFixFlakies
 
 Copy the following plugin into the Maven project's pom.xml.
+You do not need to perform this step if you have already completed the instructions
+in [Automatically setting up the pom.xml for iFixFlakies](#automatically-setting-up-the-pomxml-for-ifixflakies).
 
 ```xml
 <build>
