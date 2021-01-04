@@ -172,9 +172,9 @@ public class MinimizerPlugin extends TestPlugin {
         if (originalOrder != null) {
             TestPluginPlugin.info("Using original order to run Minimizer instead of intended or revealed order.");
             if (!isolationResult.equals(Result.PASS)) {
-                tm = minimizerBuilder.testOrder(reorderOriginalOrder(intended.order(), originalOrder)).build();
+                tm = minimizerBuilder.testOrder(reorderOriginalOrder(intended.order(), originalOrder, name)).build();
             } else {
-                tm = minimizerBuilder.testOrder(reorderOriginalOrder(revealed.order(), originalOrder)).build();
+                tm = minimizerBuilder.testOrder(reorderOriginalOrder(revealed.order(), originalOrder, name)).build();
             }
         } else if (!isolationResult.equals(Result.PASS)) { // Does not pass in isolation, needs setter, so need to minimize passing order
             tm = minimizerBuilder.testOrder(intended.order()).build();
@@ -189,7 +189,9 @@ public class MinimizerPlugin extends TestPlugin {
         return Stream.of(tm);
     }
 
-    private List<String> reorderOriginalOrder(List<String> intended, List<String> originalOrder) {
+    private List<String> reorderOriginalOrder(List<String> failingOrder, List<String> originalOrder, String dependentTest) {
+        List<String> intended = new ArrayList<>(failingOrder);
+        intended.add(dependentTest);
         List<String> retList = new ArrayList<>(intended);
 
         for (String test : originalOrder) {

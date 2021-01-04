@@ -22,6 +22,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -32,7 +33,11 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
     protected final Result isolationResult;
     protected final SmartRunner runner;
     protected final List<String> fullTestOrder;
+    // By setting ONE_BY_ONE_POLLUTERS, will find all the polluters
     private final boolean ONE_BY_ONE_POLLUTERS = Configuration.config().getProperty("dt.minimizer.polluters.one_by_one", false);
+    // Fully quailified polluter test names seperated by ';' (overwrite the order to look for polluters)
+    private final String CUSTOM_POLLUTERS = Configuration.config().getProperty("dt.minimizer.polluters.custom", "");
+    // FIND_ALL only for cleaners, not for polluters
     private static final boolean FIND_ALL = Configuration.config().getProperty("dt.find_all", true);
 
     protected final Path path;
@@ -97,7 +102,16 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
             List<PolluterData> polluters = new ArrayList<>();
             int index = 0;
 
-            if (ONE_BY_ONE_POLLUTERS) {
+            if (CUSTOM_POLLUTERS != "") {
+                final List<String> customOrder = new ArrayList<String>(Arrays.asList(CUSTOM_POLLUTERS.split(";")));
+                if (ONE_BY_ONE_POLLUTERS) {
+                    for (List<String> order : getSingleTests(customOrder, dependentTest)) {
+                        index = getPolluters(order, startTime, polluters, index);
+                    }
+                } else {
+                    getPolluters(customOrder, startTime, polluters, index);
+                }
+            } else if (ONE_BY_ONE_POLLUTERS) {
                 info("Getting all polluters (dt.minimizer.polluters.one_by_one is set to true)");
                 for (List<String> order : getSingleTests(fullTestOrder, dependentTest)) {
                     index = getPolluters(order, startTime, polluters, index);
