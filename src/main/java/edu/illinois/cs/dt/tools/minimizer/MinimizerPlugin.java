@@ -189,10 +189,11 @@ public class MinimizerPlugin extends TestPlugin {
         return Stream.of(tm);
     }
 
-    private List<String> reorderOriginalOrder(List<String> failingOrder, List<String> originalOrder, String dependentTest) {
-        List<String> intended = new ArrayList<>(failingOrder);
-        intended.add(dependentTest);
+    private List<String> reorderOriginalOrder(List<String> intended, List<String> originalOrder, String dependentTest) {
         List<String> retList = new ArrayList<>(intended);
+	if (!intended.contains(dependentTest)) {
+	    retList.add(dependentTest);
+	}
 
         for (String test : originalOrder) {
             if (!intended.contains(test)) {
