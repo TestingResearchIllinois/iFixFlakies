@@ -102,22 +102,16 @@ public class TestMinimizer extends FileCache<MinimizeTestsResult> {
             List<PolluterData> polluters = new ArrayList<>();
             int index = 0;
 
-            if (CUSTOM_POLLUTERS != "") {
-                final List<String> customOrder = new ArrayList<String>(Arrays.asList(CUSTOM_POLLUTERS.split(";")));
-                if (ONE_BY_ONE_POLLUTERS) {
-                    for (List<String> order : getSingleTests(customOrder, dependentTest)) {
-                        index = getPolluters(order, startTime, polluters, index);
-                    }
-                } else {
-                    getPolluters(customOrder, startTime, polluters, index);
-                }
-            } else if (ONE_BY_ONE_POLLUTERS) {
+            if (ONE_BY_ONE_POLLUTERS) {
                 info("Getting all polluters (dt.minimizer.polluters.one_by_one is set to true)");
-                for (List<String> order : getSingleTests(fullTestOrder, dependentTest)) {
+                List<String> testOrderToGetPolluters = fullTestOrder;
+                if (CUSTOM_POLLUTERS != "") testOrderToGetPolluters = new ArrayList<String>(Arrays.asList(CUSTOM_POLLUTERS.split(";")));
+                for (List<String> order : getSingleTests(testOrderToGetPolluters, dependentTest)) {
                     index = getPolluters(order, startTime, polluters, index);
                 }
             } else {
-                final List<String> order = new ArrayList<>(testOrder);
+                List<String> order = new ArrayList<>(testOrder);
+                if (CUSTOM_POLLUTERS != "") order = new ArrayList<String>(Arrays.asList(CUSTOM_POLLUTERS.split(";")));
                 getPolluters(order, startTime, polluters, index);
             }
 
