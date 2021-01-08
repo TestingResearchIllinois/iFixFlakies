@@ -191,9 +191,9 @@ public class MinimizerPlugin extends TestPlugin {
 
     private List<String> reorderOriginalOrder(List<String> intended, List<String> originalOrder, String dependentTest) {
         List<String> retList = new ArrayList<>(intended);
-	if (!intended.contains(dependentTest)) {
-	    retList.add(dependentTest);
-	}
+        if (!intended.contains(dependentTest)) {
+            retList.add(dependentTest);
+        }
 
         for (String test : originalOrder) {
             if (!intended.contains(test)) {
