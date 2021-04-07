@@ -73,9 +73,6 @@ public class CleanerFixerPlugin extends TestPlugin {
     private long startTime;
     private boolean foundFirst;
 
-    // Some fields to help with counting iterations of delta debug
-    private int iterations;
-
     // Don't delete. Need a default constructor for TestPlugin
     public CleanerFixerPlugin() {
     }
@@ -656,61 +653,72 @@ public class CleanerFixerPlugin extends TestPlugin {
     }
 
     private FixStatus checkCleanerRemoval(List<String> failingOrder, JavaMethod cleanerMethod, NodeList<Statement> cleanerStmts) throws Exception {
-        // Try to modify the cleanerMethod to remove the cleaner statements
-        NodeList<Statement> allStatements = cleanerMethod.body().getStatements();
-        NodeList<Statement> strippedStatements = NodeList.nodeList();
-        NodeList<Statement> otherCleanerStmts = NodeList.nodeList(cleanerStmts);
-        int j = 0;
-        for (int i = 0; i < allStatements.size(); i++) {
-            // Do not include the statement if we see it from the cleaner statements
-            if (otherCleanerStmts.contains(allStatements.get(i))) {
-                otherCleanerStmts.remove(allStatements.get(i));
-            } else {
-                strippedStatements.add(allStatements.get(i));
-            }
-        }
-
-        // If the stripped statements is still the same as all statements, then the cleaner statements must all be in @Before/After
-        if (strippedStatements.equals(allStatements)) {
-            TestPluginPlugin.info("All cleaner statements must be in setup/teardown.");
-            return FixStatus.FIX_INLINE_SETUPTEARDOWN;  // Indicating statements were in setup/teardown
-        }
-
-        // Set the cleaner method body to be the stripped version
-        restore(cleanerMethod.javaFile());
-        cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
-        cleanerMethod.method().setBody(new BlockStmt(strippedStatements));
-        cleanerMethod.javaFile().writeAndReloadCompilationUnit();
         try {
-            MvnCommands.runMvnInstall(this.project, false);
-        } catch (Exception ex) {
-            TestPluginPlugin.debug("Error building the code after stripping statements, does not compile");
-            // Restore the state
-            restore(cleanerMethod.javaFile());
-            return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
-        }
-        // First try running in isolation
-        List<String> isolationOrder = Collections.singletonList(cleanerMethod.methodName());
-        if (!testOrderPasses(isolationOrder)) {
-            TestPluginPlugin.info("Running cleaner by itself after removing statements does not pass.");
-            // Restore the state
-            restore(cleanerMethod.javaFile());
-            return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
-        }
-        // Then try running with the failing order, replacing the last test with this one
-        List<String> newFailingOrder = new ArrayList<>(failingOrder);
-        newFailingOrder.remove(newFailingOrder.size() - 1);
-        newFailingOrder.add(cleanerMethod.methodName());
-        if (testOrderPasses(newFailingOrder)) {
-            TestPluginPlugin.info("Running cleaner in failing order after polluter still passes.");
-            // Restore the state
-            restore(cleanerMethod.javaFile());
-            return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
-        }
+            // Try to modify the cleanerMethod to remove the cleaner statements
+            NodeList<Statement> allStatements = cleanerMethod.body().getStatements();
+            NodeList<Statement> strippedStatements = NodeList.nodeList();
+            NodeList<Statement> otherCleanerStmts = NodeList.nodeList(cleanerStmts);
+            int j = 0;
+            for (int i = 0; i < allStatements.size(); i++) {
+                // Do not include the statement if we see it from the cleaner statements
+                if (otherCleanerStmts.contains(allStatements.get(i))) {
+                    otherCleanerStmts.remove(allStatements.get(i));
+                } else {
+                    strippedStatements.add(allStatements.get(i));
+                }
+            }
 
-        // Restore the state
-        restore(cleanerMethod.javaFile());
-        return FixStatus.FIX_INLINE_CANREMOVE;  // Indicating statements can be removed
+            // If the stripped statements is still the same as all statements, then the cleaner statements must all be in @Before/After
+            if (strippedStatements.equals(allStatements)) {
+                TestPluginPlugin.info("All cleaner statements must be in setup/teardown.");
+                return FixStatus.FIX_INLINE_SETUPTEARDOWN;  // Indicating statements were in setup/teardown
+            }
+
+            // Set the cleaner method body to be the stripped version
+            restore(cleanerMethod.javaFile());
+            cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+            cleanerMethod.method().setBody(new BlockStmt(strippedStatements));
+            cleanerMethod.javaFile().writeAndReloadCompilationUnit();
+            try {
+                MvnCommands.runMvnInstall(this.project, false);
+            } catch (Exception ex) {
+                TestPluginPlugin.debug("Error building the code after stripping statements, does not compile");
+                //// Restore the state
+                //restore(cleanerMethod.javaFile());
+                //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+                return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
+            }
+            // First try running in isolation
+            List<String> isolationOrder = Collections.singletonList(cleanerMethod.methodName());
+            if (!testOrderPasses(isolationOrder)) {
+                TestPluginPlugin.info("Running cleaner by itself after removing statements does not pass.");
+                //// Restore the state
+                //restore(cleanerMethod.javaFile());
+                //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+                return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
+            }
+            // Then try running with the failing order, replacing the last test with this one
+            List<String> newFailingOrder = new ArrayList<>(failingOrder);
+            newFailingOrder.remove(newFailingOrder.size() - 1);
+            newFailingOrder.add(cleanerMethod.methodName());
+            if (testOrderPasses(newFailingOrder)) {
+                TestPluginPlugin.info("Running cleaner in failing order after polluter still passes.");
+                //// Restore the state
+                //restore(cleanerMethod.javaFile());
+                //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+                return FixStatus.NOD;   // Indicating did not work (TODO: Make it more clear)
+            }
+
+            //// Restore the state
+            //restore(cleanerMethod.javaFile());
+            //cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+            return FixStatus.FIX_INLINE_CANREMOVE;  // Indicating statements can be removed
+        } finally {
+            // Restore the state
+            restore(cleanerMethod.javaFile());
+            cleanerMethod = JavaMethod.find(cleanerMethod.methodName(), testSources(), classpath()).get();    // Reload, just in case
+            MvnCommands.runMvnInstall(this.project, true);
+        }
     }
 
     // Make the cleaner statements based on the cleaner method and what method needs to be modified in the process
@@ -853,7 +861,6 @@ public class CleanerFixerPlugin extends TestPlugin {
         // Minimizing cleaner code, which includes setup and teardown
         TestPluginPlugin.info("Going to modify " + methodToModify.methodName() + " to make failing order pass.");
         final List<OperationTime> elapsedTime = new ArrayList<>();
-        this.iterations = 0;
         int originalsize = statementsSize(cleanerStmts);
         final CleanerFixerDeltaDebugger finalDebugger = new CleanerFixerDeltaDebugger(this.project, this.runner, finalHelperMethod, failingOrder, finalPrepend);
         final NodeList<Statement> minimalCleanerStmts = OperationTime.runOperation(() -> {
@@ -864,16 +871,9 @@ public class CleanerFixerPlugin extends TestPlugin {
                 currentInterCleanerStmts = NodeList.nodeList(interCleanerStmts);
                 interCleanerStmts = NodeList.nodeList();
                 interCleanerStmts.addAll(finalDebugger.deltaDebug(currentInterCleanerStmts, 2));
-                // Try to go through each statement and look to see if can delta debug a try statement more
-                for (int i = 0; i < interCleanerStmts.size(); i++) {
-                    if (interCleanerStmts.get(i) instanceof TryStmt) {
-                        TryStmt tryStmt = (TryStmt)interCleanerStmts.get(i);
-                        CleanerFixerBlockDeltaDebugger internalDebugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, finalHelperMethod, failingOrder, finalPrepend, tryStmt.getTryBlock(), interCleanerStmts);
-                        NodeList<Statement> stmts = NodeList.nodeList();
-                        stmts.addAll(internalDebugger.deltaDebug(tryStmt.getTryBlock().getStatements(), 2));
-                        tryStmt.getTryBlock().setStatements(stmts);
-                    }
-                }
+
+                // Debug each statement further if they contain blocks, so debug within statements in that block(s)
+                interCleanerStmts = debugFurther(interCleanerStmts, finalHelperMethod, failingOrder, finalPrepend, interCleanerStmts);
 
                 // "Unravel" any blocks and potentially debug some more
                 NodeList<Statement> unraveledCleanerStmts = NodeList.nodeList();
@@ -915,6 +915,8 @@ public class CleanerFixerPlugin extends TestPlugin {
             return finalCleanerStmts;
         });
 
+        int iterations = finalDebugger.getIterations();
+
         BlockStmt patchedBlock = new BlockStmt(minimalCleanerStmts);
 
         // Check that the results are valid
@@ -924,7 +926,7 @@ public class CleanerFixerPlugin extends TestPlugin {
             restore(finalHelperMethod.javaFile());
             MvnCommands.runMvnInstall(this.project, false);
             Path patch = writePatch(victimMethod, 0, patchedBlock, originalsize, methodToModify, cleanerMethod, polluterMethod, elapsedTime.get(0).elapsedSeconds(), "BROKEN MINIMAL");
-            return new PatchResult(elapsedTime.get(0), FixStatus.FIX_INVALID, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), this.iterations, patch.toString());
+            return new PatchResult(elapsedTime.get(0), FixStatus.FIX_INVALID, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), iterations, patch.toString());
         }
 
         // Try to inline these statements into the method
@@ -987,7 +989,81 @@ public class CleanerFixerPlugin extends TestPlugin {
         // Final compile to get state to right place
         MvnCommands.runMvnInstall(this.project, false);
 
-        return new PatchResult(elapsedTime.get(0), fixStatus, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), this.iterations, patchFile.toString());
+        return new PatchResult(elapsedTime.get(0), fixStatus, victimMethod.methodName(), polluterMethod != null ? polluterMethod.methodName() : "N/A", cleanerMethod.methodName(), iterations, patchFile.toString());
+    }
+
+    // Debug list of statements even further, if any statement contains blocks
+    private NodeList<Statement> debugFurther(NodeList<Statement> stmts, JavaMethod helperMethod,
+                                             List<String> failingOrder, boolean prepend, NodeList<Statement> stmtsToRun) {
+        CleanerFixerBlockDeltaDebugger debugger;
+
+        // Iterate through all statements and try to debug further if contain block
+        for (int i = 0; i < stmts.size(); i++) {
+            Statement stmt = stmts.get(i);
+
+            if (stmt instanceof BlockStmt) {
+                BlockStmt blockStmt = (BlockStmt)stmt;
+
+                debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, blockStmt, stmtsToRun);
+                NodeList<Statement> minimalBlockStmts = NodeList.nodeList();
+                minimalBlockStmts.addAll(debugger.deltaDebug(blockStmt.getStatements(), 2));
+                blockStmt.setStatements(minimalBlockStmts);
+
+                // Debug further nested blocks
+                minimalBlockStmts = debugFurther(minimalBlockStmts, helperMethod, failingOrder, prepend, stmtsToRun);
+                blockStmt.setStatements(minimalBlockStmts);
+            } else if (stmt instanceof TryStmt) {
+                TryStmt tryStmt = (TryStmt)stmt;
+
+                // Do the try block part
+                debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, tryStmt.getTryBlock(), stmtsToRun);
+                NodeList<Statement> minimalBlockStmts = NodeList.nodeList();
+                minimalBlockStmts.addAll(debugger.deltaDebug(tryStmt.getTryBlock().getStatements(), 2));
+                tryStmt.setTryBlock(new BlockStmt(minimalBlockStmts));
+
+                // Debug further nested blocks
+                minimalBlockStmts = debugFurther(minimalBlockStmts, helperMethod, failingOrder, prepend, stmtsToRun);
+                tryStmt.setTryBlock(new BlockStmt(minimalBlockStmts));
+
+                // If has finally block, do that
+                if (tryStmt.getFinallyBlock().isPresent()) {
+                    debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, tryStmt.getFinallyBlock().get(), stmtsToRun);
+                    minimalBlockStmts = NodeList.nodeList();
+                    minimalBlockStmts.addAll(debugger.deltaDebug(tryStmt.getFinallyBlock().get().getStatements(), 2));
+                    tryStmt.setFinallyBlock(new BlockStmt(minimalBlockStmts));
+
+                    // Debug further nested blocks
+                    minimalBlockStmts = debugFurther(minimalBlockStmts, helperMethod, failingOrder, prepend, stmtsToRun);
+                    tryStmt.setFinallyBlock(new BlockStmt(minimalBlockStmts));
+
+                    // If the finally block is empty, remove
+                    if (minimalBlockStmts.isEmpty()) {
+                        tryStmt.removeFinallyBlock();
+                    }
+                }
+
+                // Special case for try: see if we can remove the try and change just to a normal block
+                // This can happen if minimized enough statements as to remove the ones that actually throw exceptions
+                if (!tryStmt.getFinallyBlock().isPresent()) {   // For now, only do if finally block is not there
+                    BlockStmt blockStmt = new BlockStmt();
+                    blockStmt.setStatements(tryStmt.getTryBlock().getStatements());
+
+                    // Manipulate list to add this block at that location and remove the try that got shifted next
+                    stmts.add(i, blockStmt);
+                    stmts.remove(i + 1);
+
+                    // Use debugger to just check if things work with this block instead of try
+                    debugger = new CleanerFixerBlockDeltaDebugger(this.project, this.runner, helperMethod, failingOrder, prepend, blockStmt, stmtsToRun);
+                    if (!debugger.checkValid(blockStmt.getStatements())) {
+                        // If invalid, we should set the try statement back in
+                        stmts.add(i, tryStmt);
+                        stmts.remove(i + 1);
+                    }
+                }
+            }
+        }
+
+        return stmts;
     }
 
     // Helper method to create a patch file adding in the passed in block
