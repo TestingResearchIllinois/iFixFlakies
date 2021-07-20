@@ -847,10 +847,10 @@ public class CleanerFixerPlugin extends TestPlugin {
         if (methodToModify == null) {   // If not method returned, means things are broken
             // Restore files back to what they were before and recompile, in preparation for later
             if (polluterMethod != null) {
-                backup(polluterMethod.javaFile());
+                restore(polluterMethod.javaFile());
             }
-            backup(victimMethod.javaFile());
-            backup(cleanerMethod.javaFile());
+            restore(victimMethod.javaFile());
+            restore(cleanerMethod.javaFile());
             MvnCommands.runMvnInstall(this.project, false);
             NodeList<Statement> initialCleanerStmts = makeCleanerStatements(cleanerMethod, victimMethod);
             Path patch = writePatch(victimMethod, 0, new BlockStmt(initialCleanerStmts), statementsSize(initialCleanerStmts), null, cleanerMethod, polluterMethod, 0, "CLEANER DOES NOT FIX");
