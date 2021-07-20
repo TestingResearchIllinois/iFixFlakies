@@ -29,6 +29,7 @@ import edu.illinois.cs.dt.tools.utility.MvnCommands;
 import edu.illinois.cs.dt.tools.utility.OperationTime;
 import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.data.results.Result;
+import edu.illinois.cs.testrunner.mavenplugin.MavenProjectWrapper;
 import edu.illinois.cs.testrunner.mavenplugin.TestPlugin;
 import edu.illinois.cs.testrunner.mavenplugin.TestPluginPlugin;
 import edu.illinois.cs.testrunner.runner.Runner;
@@ -65,6 +66,7 @@ public class CleanerFixerPlugin extends TestPlugin {
     public static final String PATCH_LINE_SEP = "==========================";
 
     private MavenProject project;
+    private MavenProjectWrapper projectWrapper;
     private InstrumentingSmartRunner runner;
 
     private List<Patch> patches;
@@ -106,9 +108,10 @@ public class CleanerFixerPlugin extends TestPlugin {
     @Override
     public void execute(final MavenProject project) {
         this.project = project;
+        this.projectWrapper = new MavenProjectWrapper(project, TestPluginPlugin.mojo().getLog());
 
         final Option<Runner> runnerOption = RunnerFactory.from(project);
-        final ErrorLogger logger = new ErrorLogger(project);
+        final ErrorLogger logger = new ErrorLogger(projectWrapper);
 
         this.patches = new ArrayList<>();
 
@@ -122,7 +125,7 @@ public class CleanerFixerPlugin extends TestPlugin {
                 this.runner = InstrumentingSmartRunner.fromRunner(runnerOption.get());
 
                 if (!Files.exists(DetectorPathManager.originalOrderPath()) && MinimizerPlugin.ORIGINAL_ORDER == null) {
-                    Files.write(DetectorPathManager.originalOrderPath(), DetectorPlugin.getOriginalOrder(project));
+                    Files.write(DetectorPathManager.originalOrderPath(), DetectorPlugin.getOriginalOrder(projectWrapper, this.runner.framework()));
                 }
 
                 startTime = System.currentTimeMillis();
@@ -170,7 +173,7 @@ public class CleanerFixerPlugin extends TestPlugin {
     private Stream<MinimizeTestsResult> detect() throws Exception {
         if (!Files.exists(DetectorPathManager.detectionFile())) {
             if (Configuration.config().getProperty("diagnosis.run_detection", true)) {
-                new DetectorPlugin(DetectorPathManager.detectionResults(), runner).execute(project);
+                new DetectorPlugin(DetectorPathManager.detectionResults(), runner).execute(projectWrapper);
             } else if (MinimizerPlugin.FLAKY_LIST == null) {
                 throw new NoSuchFileException("File " + DetectorPathManager.detectionFile() + " does not exist and diagnosis.run_detection is set to false");
             }
