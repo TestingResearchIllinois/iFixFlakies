@@ -12,6 +12,7 @@ import edu.illinois.cs.dt.tools.runner.data.TestRun;
 import edu.illinois.cs.dt.tools.utility.ErrorLogger;
 import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.data.results.Result;
+import edu.illinois.cs.testrunner.mavenplugin.MavenProjectWrapper;
 import edu.illinois.cs.testrunner.mavenplugin.TestPlugin;
 import edu.illinois.cs.testrunner.mavenplugin.TestPluginPlugin;
 import edu.illinois.cs.testrunner.runner.Runner;
@@ -52,6 +53,7 @@ public class MinimizerPlugin extends TestPlugin {
     }
 
     private Stream<TestMinimizer> fromDtList(Path path, MavenProject project) {
+        MavenProjectWrapper projectWrapper = new MavenProjectWrapper(project, TestPluginPlugin.mojo().getLog());
         if (FLAKY_LIST != null) {
             path = Paths.get(FLAKY_LIST);
             TestPluginPlugin.info("dt.minimizer.flaky.list argument specified: " + FLAKY_LIST);
@@ -101,7 +103,7 @@ public class MinimizerPlugin extends TestPlugin {
             if (!Files.exists(originalOrderPath) || originalOrder.isEmpty()) {
                 TestPluginPlugin.info("Original order file not found or is empty. Creating original-order file now at: "
                                       + originalOrderPath);
-                originalOrder = DetectorPlugin.getOriginalOrder(project, true);
+                originalOrder = DetectorPlugin.getOriginalOrder(projectWrapper, this.runner.framework(), true);
                 Files.write(originalOrderPath, originalOrder);
             }
 
@@ -113,7 +115,7 @@ public class MinimizerPlugin extends TestPlugin {
             } else if (dependentTestList == null) {
                 // Run random class method a few times to see if test would be OD
                 Detector detector = new RandomDetector("random", runner,
-                                                       DetectorPlugin.moduleRounds(new ErrorLogger(project).coordinates()),
+                                                       DetectorPlugin.moduleRounds(new ErrorLogger(projectWrapper).coordinates()),
                                                        originalOrder);
                 dependentTestList = new DependentTestList(detector.detect());
             }
