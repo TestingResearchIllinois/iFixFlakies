@@ -25,7 +25,7 @@ cd - > /dev/null
 cd ${working_dir}
 
 javac PomFile.java
-find ${project_path} -name pom.xml | grep -v "src/" | java PomFile ${ARTIFACT_ID} ${ARTIFACT_VERSION} ${CONFIGURATION_CLASS}
+find ${project_path} -name pom.xml | grep -v "src/" | grep -v "target/" | java PomFile ${ARTIFACT_ID} ${ARTIFACT_VERSION} ${CONFIGURATION_CLASS}
 rm -f PomFile.class
 
 cd ${crnt}
