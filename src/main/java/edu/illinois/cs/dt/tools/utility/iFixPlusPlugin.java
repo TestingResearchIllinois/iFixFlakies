@@ -13,31 +13,53 @@ import edu.illinois.cs.testrunner.mavenplugin.TestPlugin;
 import edu.illinois.cs.testrunner.mavenplugin.TestPluginPlugin;
 import edu.illinois.cs.testrunner.runner.Runner;
 import edu.illinois.cs.testrunner.runner.RunnerFactory;
+import org.apache.commons.io.FileUtils;
 import org.apache.maven.project.MavenProject;
+import org.w3c.dom.Node;
 import scala.util.Try;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileReader;
+import java.io.BufferedReader;
+import java.io.PrintWriter;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.FileNotFoundException;
+import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashSet;
+
+import org.xmlunit.builder.DiffBuilder;
+import org.xmlunit.diff.Comparison.Detail;
+import org.xmlunit.diff.DefaultNodeMatcher;
+import org.xmlunit.diff.Diff;
+import org.xmlunit.diff.Difference;
+import org.xmlunit.diff.ElementSelectors;
 
 public class iFixPlusPlugin extends TestPlugin {
     private Path replayPath;
     private Path replayPath2;
     private String dtname;
-    private String dtjavapPath = "";
     private String subxmlFold;
+    private String rootFold;
     private String module;
     private String output;
     private String slug;
     private String tmpfile;
     private String diffFieldsFold;
+    private String subdiffsFold;
     private String reflectionFold;
-    //private String lognum;
+
+    private Set<String> diffFields_filtered = new HashSet<String> ();
+
     @Override
     public void execute(final MavenProject mavenProject) {
         long startTime = System.currentTimeMillis();
@@ -46,7 +68,6 @@ public class iFixPlusPlugin extends TestPlugin {
         // If the maven project has both JUnit 4 and JUnit 5 tests, two runners will
         // be returned
         List<Runner> runners = RunnerFactory.allFrom(mavenProject);
-        //runners = removeZombieRunners(runners, project);
 
         if (runners.size() != 1) {
             // HACK: Always force JUnit 4
@@ -97,12 +118,12 @@ public class iFixPlusPlugin extends TestPlugin {
         output= Configuration.config().getProperty("replay.output");
         slug= Configuration.config().getProperty("replay.slug");
         subxmlFold = Configuration.config().getProperty("replay.subxmlFold");
+        rootFold = Configuration.config().getProperty("replay.rootFold");
         tmpfile = Configuration.config().getProperty("replay.tmpfile");
         module = Configuration.config().getProperty("replay.module");
         diffFieldsFold = Configuration.config().getProperty("replay.diffFieldsFold");
+        subdiffsFold = Configuration.config().getProperty("replay.subdiffsFold");
         reflectionFold = Configuration.config().getProperty("replay.reflectionFold");
-
-        //lognum = Configuration.config().getProperty("replay.lognum");
 
         int xmlFileNum = countDirNums(subxmlFold);
         System.out.println("xmlFileName: " + xmlFileNum);
@@ -214,9 +235,6 @@ public class iFixPlusPlugin extends TestPlugin {
                     // phase 2: run doublevictim order state capture
                     write2tmp("2");
                     doublevictim = true;
-                    // Files.write(Paths.get(output),
-                    //         "doublevictim,".getBytes(),
-                    //         StandardOpenOption.APPEND);
                     try {
                         runner.runList(victim());
                     }
@@ -243,9 +261,6 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("enter phase 3!!!");
                     // phase 3: run passorder (indicated in the json) state capture;
                     write2tmp("3");
-                    // Files.write(Paths.get(output),
-                    //         "passorder,".getBytes(),
-                    //         StandardOpenOption.APPEND);
                     try{
                         runner.runList(testPassOrder_full());
                     }
@@ -302,32 +317,32 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                 }
 
-                //System.out.println("FailOrder: " + testFailOrder());
-
                 // phase 5: do the diff
                 System.out.println("enter phase 5!!!");
 
                 xmlFileNum = countDirNums(subxmlFold);
                 System.out.println("xmlFileNum: " + xmlFileNum);
                 if(xmlFileNum == 2) {
-                    System.out.println("begining diff!!!!!!!!!!");
+                    System.out.println("beginning diff!!!!!!!!!!");
                     if(doublevictim) {
                         System.out.println("doublevictim!!");
-                        write2tmp("5doublevic");
+                        // write2tmp("5doublevic");
                         try {
-                            runner.runList(victim());
+                            System.out.println("doing diff%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+                            // runner.runList(victim());
+                            diffing();
                         }
                         catch (Exception e){
-                            System.out.println("error in phase 1: " + e);
+                            System.out.println("error in phase 5(doing diffing): " + e);
                         }
                     }
                     else{
                         System.out.println("passorder!!");
-                        write2tmp("5");
+                        // write2tmp("5");
                         try {
                             System.out.println("doing diff%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                            runner.runList(testPassOrder_full());
-                            // runner.wait();
+                            // runner.runList(testPassOrder_full());
+                            diffing();
                         } catch (Exception e) {
                             System.out.println("error in failing failing order!" + e);
                         }
@@ -349,24 +364,10 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 System.out.println("reflection begin!!\n");
 
-                // reflect at the before state
-                /*String prefix = "diffFieldBefore ";
-                boolean reflectBeforeSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
-                if(reflectBeforeSuccess) {
-                    Files.write(Paths.get(output), "BeforeSuccess,".getBytes(),
-                            StandardOpenOption.APPEND);
-                }
-                else {
-                    Files.write(Paths.get(output), "BeforeFail,".getBytes(),
-                            StandardOpenOption.APPEND);
-                }*/
-
                 // reflect at the after state
                 String prefix = "diffFieldAfter " + lastPolluter() + " ";
                 boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectAfterOneSuccess) {
-                    // Files.write(Paths.get(output), "AfterOneSuccess,".getBytes(),
-                    //         StandardOpenOption.APPEND);
                     String successfulField = "";
                     try (BufferedReader br = new BufferedReader(new FileReader(reflectionFile))) {
                         String line;
@@ -390,19 +391,6 @@ public class iFixPlusPlugin extends TestPlugin {
                     }
                 }
                 else {
-                    // reflect fields using delta-debugging
-                    /* boolean reflectAfterSuccess = reflectFields(diffFile, reflectionFile, runner, prefix);
-                    if(reflectAfterSuccess) {
-                        Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
-                                StandardOpenOption.APPEND);
-                    }
-                    else {
-                        Files.write(Paths.get(output), "AfterFail,".getBytes(),
-                                StandardOpenOption.APPEND);
-                    } */
-
-                    // Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
-                    //         StandardOpenOption.APPEND);
                     timing(startTime);
                     Files.write(Paths.get(output), "FAIL,".getBytes(),
                             StandardOpenOption.APPEND);
@@ -414,7 +402,6 @@ public class iFixPlusPlugin extends TestPlugin {
         } else {
             TestPluginPlugin.mojo().getLog().info("Module is not using a supported test framework (probably not JUnit).");
         }
-        // timing(startTime);
     }
 
     private void timing(long startTime) {
@@ -463,50 +450,13 @@ public class iFixPlusPlugin extends TestPlugin {
                 }
             }
         } catch (FileNotFoundException e) {
+            e.printStackTrace();
             System.out.println("FileNotFoundException");
         }
 
         return reflectSuccess;
 
     }
-
-    /* private boolean reflectFields(String diffFile, File reflectionFile, Runner runner, String prefix) throws IOException {
-        boolean reflectSuccess = false;
-        String header = "*************************reflection more than one on " + prefix.split(" ")[0] + "************************\n";
-        Files.write(Paths.get(reflectionFile.getAbsolutePath()), header.getBytes(),
-                StandardOpenOption.APPEND);
-
-        List<String> diffFields = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(diffFile))) {
-            String diffField;
-            while ((diffField = br.readLine()) != null) {
-                diffFields.add(diffField);
-            }
-        }
-
-        try {
-            System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-            ReflectionDeltaDebugger deltaDebugger = new ReflectionDeltaDebugger(runner, dtname, testFailOrder(), diffFields, prefix, tmpfile);
-            List<String> finalDiffFields = deltaDebugger.deltaDebug(diffFields, 2);
-            if(deltaDebugger.checkValid(finalDiffFields)) {
-                System.out.println("reflection on diffFields: " + finalDiffFields + " is success!!");
-                String output = "########" + finalDiffFields + " made test success#######\n";
-                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
-                        StandardOpenOption.APPEND);
-                reflectSuccess = true;
-            }
-            else {
-                String output = "########" + finalDiffFields + " made test fail######\n";
-                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
-                        StandardOpenOption.APPEND);
-            }
-        } catch (Exception e) {
-            System.out.println("error in reflection for field: ");
-                    // + finalDiffFields + " " + e);
-        }
-        return reflectSuccess;
-    } */
-
 
         /* arr[]  ---> Input Array
         data[] ---> Temporary array to store current combination
@@ -554,7 +504,7 @@ public class iFixPlusPlugin extends TestPlugin {
             for(int i=0; i<n; i++) {
                 data.add("");
             }
-            // Print all combination using temprary array 'data[]'
+            // Print all combination using temporary array 'data[]'
             List<List<String>> results = new ArrayList<>();
             combinationUtil(arr, data, 0, n-1, 0, r, results);
             return results;
@@ -572,28 +522,6 @@ public class iFixPlusPlugin extends TestPlugin {
         partialOrder.add(dtname);
         return partialOrder;
     }
-
-    /*private List<String> testPassOrder() throws IOException {
-        try {
-            System.out.println("$$$$$$$$$$$modeluePath: " + PathManager.modulePath());
-            List<DependentTest> dtl = new Gson().fromJson(FileUtil.readFile(replayPath), DependentTestList.class).dts();
-            System.out.println("dtl!!!!!!!!!!!");
-            //must have one dt in dtl
-            DependentTest dt = dtl.get(0);
-
-            List<String> partialOrder = new ArrayList<String>();
-            // intended => passing order
-            for(String s: dt.intended().order()) {
-                partialOrder.add(s);
-                if(s.equals(dt.name()))
-                    break;
-            }
-            return partialOrder;
-        } catch (Exception e) {
-            System.out.println("expection in reading json!!!!!");
-            return Files.readAllLines(replayPath);
-        }
-    }*/
 
     private List<String> testPassOrder_full() throws IOException {
         try {
@@ -621,7 +549,7 @@ public class iFixPlusPlugin extends TestPlugin {
             return null;
 
         } catch (Exception e) {
-            System.out.println("expection in reading json!!!!!");
+            System.out.println("exception in reading json!!!!!");
             return null;
         }
     }
@@ -661,7 +589,7 @@ public class iFixPlusPlugin extends TestPlugin {
             return null;
 
         } catch (Exception e) {
-            System.out.println("expection in reading json!!!!!");
+            System.out.println("exception in reading json!!!!!");
             return null;
         }
     }
@@ -681,12 +609,12 @@ public class iFixPlusPlugin extends TestPlugin {
             }
             return null;
         } catch (Exception e) {
-            System.out.println("expection in reading json for failing order!!!!!");
+            System.out.println("exception in reading json for failing order!!!!!");
             return null;
         }
     }
 
-    private String lastPolluter() throws IOException {
+    private String lastPolluter() {
         if(replayPath2.toString().equals("")) {
             return lastPolluter_full();
         }
@@ -695,31 +623,29 @@ public class iFixPlusPlugin extends TestPlugin {
         }
     }
 
-    private String lastPolluter_full() throws IOException {
+    private String lastPolluter_full() {
         try {
             List<String> failorder = testFailOrder_full();
             return failorder.get(failorder.size()-2);
         } catch (Exception e) {
-            System.out.println("expection in lastPolluter_full!!!!!");
+            System.out.println("exception in lastPolluter_full!!!!!");
             return null;
         }
     }
 
-    private String lastPolluter_minimized() throws IOException {
+    private String lastPolluter_minimized() {
         try {
             System.out.println("$$$$$$$$$$$replayPath2: " + replayPath2);
             List<PolluterData> polluters = new Gson().fromJson(FileUtil.readFile(replayPath2), MinimizeTestsResult.class).polluters();
             System.out.println("polluters!!!!!!!!!!!");
             for(PolluterData pd: polluters) {
                 if(pd.deps().size() >=1) {
-                    //failingTests.addAll(pd.deps());
-                    //failingTests.add(dtname);
                     return pd.deps().get(pd.deps().size()-1);
                 }
             }
             return null;
         } catch (Exception e) {
-            System.out.println("expection in reading json for failing order!!!!!");
+            System.out.println("exception in reading json for failing order!!!!!");
             return null;
         }
     }
@@ -734,4 +660,161 @@ public class iFixPlusPlugin extends TestPlugin {
         }
         return num;
     }
+
+    public void diffing() {
+        try {
+            diffSub();
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    private void recordsubDiff(String beforeState,
+                               String afterState, String fileName) {
+        try {
+            // create a string builder
+            StringBuilder sb = new StringBuilder();
+            System.out.println("REACH 0");
+            Diff diff = DiffBuilder.compare(beforeState).withTest(afterState).
+                    withNodeMatcher(new DefaultNodeMatcher(
+                            ElementSelectors.byName
+                    ))
+                    .checkForSimilar()
+                    .build();
+            Iterable<Difference> differences = diff.getDifferences();
+            for (Object object : differences) {
+                Difference difference = (Difference)object;
+
+                sb.append("***********************\n");
+                sb.append(difference);
+                sb.append("\n~~~~\n");
+                makeSubDifferenceReport(difference, sb);
+                sb.append("***********************\n");
+            }
+            writeToFile(fileName, sb.toString(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String readFile(String path) throws IOException {
+        File file = new File(path);
+        return FileUtils.readFileToString(file, "UTF-8");
+    }
+
+    Set<String> File2SetString(String path) {
+        File file = new File(path);
+        Set<String> keys = new HashSet<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                keys.add(line);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return keys;
+    }
+
+    private void diffSub() throws FileNotFoundException, UnsupportedEncodingException {
+        String subxml0 = subxmlFold + "/0xml";
+        String subxml1 = subxmlFold + "/1xml";
+        String afterRootPath= rootFold + "/1.txt";
+        System.out.println(subxml0 + "; " + subxml1 + "; " + afterRootPath + "; ");
+        Set<String> afterRoots = File2SetString(afterRootPath);
+
+        System.out.println(diffFieldsFold + "; ");
+        for(String s: afterRoots) {
+
+            String path0 = subxml0 + "/" + s + ".xml";
+            String path1 = subxml1 + "/" + s + ".xml";
+            String state0 = ""; String state1 = "";
+            File file0 = new File(path0);
+            if(!file0.exists()){
+                continue;
+            }
+            else {
+                try{
+                    state0 = readFile(path0);
+                    state1 = readFile(path1);
+                }
+                catch(IOException e) {
+                    e.printStackTrace();
+                }
+
+                if (!state0.equals(state1)) {
+                    diffFields_filtered.add(s);
+                    String subdiffFile = subdiffsFold + "/" + s + ".txt";
+                    System.out.println(subdiffFile + "; ");
+                    recordsubDiff(state0, state1, subdiffFile);
+                }
+            }
+        }
+        System.out.println(diffFields_filtered + "; ");
+        int num = new File(diffFieldsFold).listFiles().length;
+        System.out.println(diffFieldsFold + "; ");
+        PrintWriter writer = new PrintWriter(diffFieldsFold + "/" + num+ ".txt", "UTF-8");
+
+        for(String ff: diffFields_filtered) {
+
+            writer.println(ff);
+        }
+        writer.close();
+    }
+
+
+    /**
+     * Writes content into a file.
+     *
+     * @param  fn       name of the destination file
+     * @param  content  string representing the data to be written
+     * @param  append   boolean indicating whether to append to destination file or rewrite it
+     */
+    protected void writeToFile(String fn, String content, boolean append) {
+        try {
+            File f = new File(fn);
+            f.createNewFile();
+
+            FileWriter fw = new FileWriter(f.getAbsoluteFile(), append);
+            BufferedWriter w = new BufferedWriter(fw);
+            w.write(content);
+            w.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void makeSubDifferenceReport(Difference difference, StringBuilder sb) {
+        Detail controlNode = difference.getComparison().getControlDetails();
+        Detail afterNode = difference.getComparison().getTestDetails();
+
+        String diffXpath = controlNode.getXPath();
+        if (diffXpath == null) {
+            diffXpath = afterNode.getXPath();
+            if (diffXpath == null) {
+                sb.append("NULL xpath\n");
+                return;
+            }
+        }
+        sb.append(controlNode.getXPath());
+        sb.append("\n");
+        sb.append(afterNode.getXPath());
+        sb.append("\n");
+
+        sb.append(difference.getComparison().getType() + "\n");
+        sb.append("--------\n");
+
+        // Deal specifically with <entry> if in map
+        if (controlNode != null) {
+            Node target = controlNode.getTarget();
+            if (target != null && target.getNodeName().equals("entry")) {   // Tag name "entry" matches some map structure we want to explore
+                for (int i = 0; i < target.getChildNodes().getLength(); i++) {
+                    sb.append(target.getChildNodes().item(i).getTextContent());
+                    sb.append("\n");
+                }
+            }
+        }
+    }
+
 }
