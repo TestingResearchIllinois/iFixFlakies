@@ -62,6 +62,8 @@ public class iFixPlusPlugin extends TestPlugin {
 
     @Override
     public void execute(final MavenProject mavenProject) {
+        Configuration.config().properties().setProperty("statecapture.phase", "initial");
+
         long startTime = System.currentTimeMillis();
 
         // Currently there could two runners, one for JUnit 4 and one for JUnit 5
@@ -133,48 +135,44 @@ public class iFixPlusPlugin extends TestPlugin {
             System.out.println("module: " + module);
 
             try {
-                //final Runner runner = runnerOption.get(); // safe because we checked above
-                System.out.println("tests!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" +
-                        "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-
                 Files.write(Paths.get(output),
                         (lastPolluter() + ",").getBytes(),
                         StandardOpenOption.APPEND);
                 // phase 0 check json file
-                System.out.println("phase 0 begin");
-                write2tmp("0");
-                if(testFailOrder()==null) {
+                System.out.println("~~~~~~ Begin to check if this test is a true order-dependent test.");
+                Configuration.config().properties().setProperty("statecapture.phase", "check");
+                if (testFailOrder()==null) {
                     timing(startTime);
                     Files.write(Paths.get(output),
                             "0,0,0,0,0,0,0,wrongjsonfail,".getBytes(),
                             StandardOpenOption.APPEND);
-                    System.out.println("original json file wrong!!");
+                    System.out.println("## Original json file is wrong!");
                     return;
                 }
 
-                if(testPassOrder_full()==null) {
+                if (testPassOrder_full()==null) {
                     timing(startTime);
                     Files.write(Paths.get(output),
                             "0,0,0,0,0,0,0,wrongjsonpass,".getBytes(),
                             StandardOpenOption.APPEND);
-                    System.out.println("original json file wrong!!");
+                    System.out.println("## Original json file is wrong!");
                     return;
                 }
 
                 for(int i=0; i<10; i++) {
                     Try<TestRunResult> phase0ResultFail = null;
-                    try{
+                    try {
                         phase0ResultFail = runner.runList(testFailOrder());
                     }
-                    catch(Exception ex) {
-                        System.out.println("error in phase 0 failing order: " + ex);
+                    catch (Exception ex) {
+                        System.out.println("## Encountering error when checking the failing order: " + ex);
                     }
 
                     System.out.println("Failing order results: " +
                             phase0ResultFail.get().results().get(dtname).result().toString());
 
-                    if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
-                        System.out.println("json file wrong!!");
+                    if (phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
+                        System.out.println("## Failing order json file is wrong!");
                         timing(startTime);
                         Files.write(Paths.get(output),
                                 "0,0,0,0,0,0,0,wrongjsonfail2,".getBytes(),
@@ -185,17 +183,17 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 for(int i=0; i<10; i++) {
                     Try<TestRunResult> phase0ResultPass = null;
-                    try{
+                    try {
                         phase0ResultPass = runner.runList(testPassOrder_full());
                     }
-                    catch(Exception ex) {
-                        System.out.println("error in phase 0 pass order: " + ex);
+                    catch (Exception ex) {
+                        System.out.println("## Encountering error when checking the passing order: " + ex);
                     }
-                    System.out.println("passing order results: " +
+                    System.out.println("Passing order results: " +
                             phase0ResultPass.get().results().get(dtname).result().toString());
 
-                    if(!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
-                        System.out.println("json file wrong!!");
+                    if (!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
+                        System.out.println("## Passing order json file is wrong!");
                         timing(startTime);
                         Files.write(Paths.get(output),
                                 "0,0,0,0,0,0,0,wrongjsonpass2,".getBytes(),
@@ -206,13 +204,12 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 timing(startTime);
                 startTime = System.currentTimeMillis();
-                System.out.println("phase 0 ends");
+                System.out.println("~~~~~~ Finish checking if this test is a true order-dependent test.");
 
-                 //phase 1: run doublevictim order
+                //phase 1: run doublevictim order
                 Try<TestRunResult> phase1Result = null;
-                try{
-                    System.out.println("phase 1!!!");
-                    write2tmp("1");
+                try {
+                    System.out.println("~~~~~~ Begin running double victim order to check if it is a double victim!");
 
                     Configuration.config().properties().
                             setProperty("testplugin.runner.idempotent.num.runs", "2");
@@ -220,28 +217,29 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println(phase1Result.get().results().get(dtname+":1").result());
                     Configuration.config().properties().
                             setProperty("testplugin.runner.idempotent.num.runs", "-1");
-                    System.out.println("phase 1 results: " + phase1Result.get().results());
+                    System.out.println("## Running double victim order results: " + phase1Result.get().results());
                 }
-                catch(Exception e) {
-                    System.out.println("error in phase 1: " + e);
+                catch (Exception e) {
+                    System.out.println("## Encountering error when running in double victim order: " + e);
                 }
                 timing(startTime);
                 startTime = System.currentTimeMillis();
-                System.out.println("finished phase 1!!");
+                System.out.println("~~~~~~ Finished running double victim order!");
 
-                boolean doublevictim = false;
-                if(phase1Result.get().results().get(dtname+":1").result().toString().equals("PASS")) {
-                    System.out.println("enter phase 2!!!");
+                if (phase1Result.get().results().get(dtname+":1").result().toString().equals("PASS")) {
+                    System.out.println("~~~~~~ Begin capturing the state in passing order!");
                     // phase 2: run doublevictim order state capture
-                    write2tmp("2");
-                    doublevictim = true;
+                    Configuration.config().properties().
+                            setProperty("statecapture.phase", "capture_after");
+                    Configuration.config().properties().
+                            setProperty("statecapture.state", "passing_order");
                     try {
                         runner.runList(victim());
                     }
-                    catch (Exception e){
-                        System.out.println("error in phase 2: " + e);
+                    catch (Exception e) {
+                        System.out.println("## Encountering error in capturing the state in passing order: " + e);
                     }
-                    System.out.println("finished phase 2!!");
+                    System.out.println("~~~~~~ Finished capturing the state in passing order!");
                     timing(startTime);
                     startTime = System.currentTimeMillis();
                     Files.write(Paths.get(output),
@@ -249,23 +247,30 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                 }
                 else {
-                    System.out.println("enter phase 2tmp!!!");
+                    System.out.println("~~~~~~ Begin loading the classes when the test is a double victim!");
                     //phase 2tmp: run doublevictim order state capture
-                    write2tmp("2tmp");
+                    Configuration.config().properties().
+                            setProperty("statecapture.phase", "capture_after");
+                    Configuration.config().properties().
+                            setProperty("statecapture.state", "double_victim");
                     try {
                         runner.runList(victim());
                     }
-                    catch (Exception e){
-                        System.out.println("error in phase 2tmp: " + e);
+                    catch (Exception e) {
+                        System.out.println("## Encounter error in loading the classes when the test is a double victim: " + e);
                     }
-                    System.out.println("enter phase 3!!!");
+                    System.out.println("~~~~~~ Finish loading the classes when the test is a double victim!");
+                    System.out.println("~~~~~~ Begin capturing the state in passing order(double victim)!!!");
                     // phase 3: run passorder (indicated in the json) state capture;
-                    write2tmp("3");
-                    try{
+                    Configuration.config().properties().
+                            setProperty("statecapture.phase", "capture_before");
+                    Configuration.config().properties().
+                            setProperty("statecapture.state", "passing_order");
+                    try {
                         runner.runList(testPassOrder_full());
                     }
-                    catch(Exception e) {
-                        System.out.println("error in running passing order!");
+                    catch (Exception e) {
+                        System.out.println("## Encounter error in capturing the state in passing order(double victim)!");
                     }
 
                     Files.write(Paths.get(output),
@@ -273,44 +278,51 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                     timing(startTime);
                     startTime = System.currentTimeMillis();
-                    System.out.println("finished passing order state capturing!!");
                     System.out.println("passOrder: " + testPassOrder_full());
-                    System.out.println("finished phase 3!!");
+                    System.out.println("~~~~~~ Finish phase capturing the state in passing order(double victim)!!");
                 }
 
                 xmlFileNum = countDirNums(subxmlFold);
                 System.out.println("xmlFileName: " + xmlFileNum);
 
                 // phase 4: failing order before state capture;
-                System.out.println("enter phase 4 before!!");
-                write2tmp("4");
+                System.out.println("~~~~~~ Begin capturing the state in failing order!!");
+                Configuration.config().properties().
+                        setProperty("statecapture.phase", "capture_before");
+                Configuration.config().properties().
+                        setProperty("statecapture.state", "failing_order");
                 try {
                     runner.runList(testFailOrder());
                 }
-                catch(Exception e) {
-                    System.out.println("error in phase 4 before!! " + e);
+                catch (Exception e) {
+                    System.out.println("## Encounter error in capturing the state in failing order!! " + e);
 
                 }
 
                 timing(startTime);
                 startTime = System.currentTimeMillis();
-                System.out.println("finish phase 4 before!!");
+                System.out.println("~~~~~~ Finish phase capturing the state in failing order!!");
 
-                xmlFileNum = countDirNums(subxmlFold);
-                if(xmlFileNum != 2) {
+                File failingSubXmlFolder = new File(subxmlFold + "/failing_order_xml");
+                if (!failingSubXmlFolder.exists()) {
                     // phase 4: failing order after state capture;
-                    write2tmp("4 " + lastPolluter());
-                    System.out.println("enter phase 4 after!!");
+                    Configuration.config().properties().
+                            setProperty("statecapture.phase", "capture_after");
+                    Configuration.config().properties().
+                            setProperty("statecapture.state", "failing_order");
+                    Configuration.config().properties().
+                            setProperty("statecapture.polluter", lastPolluter());
+                    System.out.println("~~~~~~ Begin capturing the state in failing order!!");
                     try {
                         runner.runList(testFailOrder());
                     }
-                    catch(Exception e) {
-                        System.out.println("error in phase 4 after!! " + e);
+                    catch (Exception e) {
+                        System.out.println("## Encounter error in phase capturing the state in failing order!! " + e);
 
                     }
                     timing(startTime);
                     startTime = System.currentTimeMillis();
-                    System.out.println("finish phase 4 after!!");
+                    System.out.println("~~~~~~ Finish phase capturing the state in failing order!!");
                 } else {
                     Files.write(Paths.get(output),
                             "0,".getBytes(),
@@ -318,61 +330,45 @@ public class iFixPlusPlugin extends TestPlugin {
                 }
 
                 // phase 5: do the diff
-                System.out.println("enter phase 5!!!");
+                System.out.println("~~~~~~ Begin diffing between the passing order and failing order!!!");
 
                 xmlFileNum = countDirNums(subxmlFold);
                 System.out.println("xmlFileNum: " + xmlFileNum);
-                if(xmlFileNum == 2) {
-                    System.out.println("beginning diff!!!!!!!!!!");
-                    if(doublevictim) {
-                        System.out.println("doublevictim!!");
-                        // write2tmp("5doublevic");
-                        try {
-                            System.out.println("doing diff%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                            // runner.runList(victim());
-                            diffing();
-                        }
-                        catch (Exception e){
-                            System.out.println("error in phase 5(doing diffing): " + e);
-                        }
+
+                File passingSubXmlFolder = new File(subxmlFold + "/failing_order_xml");
+                if (passingSubXmlFolder.exists() && failingSubXmlFolder.exists()) {
+                    try {
+                        diffing();
                     }
-                    else{
-                        System.out.println("passorder!!");
-                        // write2tmp("5");
-                        try {
-                            System.out.println("doing diff%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                            // runner.runList(testPassOrder_full());
-                            diffing();
-                        } catch (Exception e) {
-                            System.out.println("error in failing failing order!" + e);
-                        }
+                    catch (Exception e) {
+                        System.out.println("## Encounter error in doing diffing: " + e);
                     }
                 }
                 else {
-                    System.out.println("cannot do diff, the number of xml files is not 2!!");
+                    System.out.println("## Cannot do diff, xml files are not complete!");
                 }
 
                 timing(startTime);
                 startTime = System.currentTimeMillis();
+                System.out.println("~~~~~~ Finish diffing between the passing order and failing order!!!");
 
                 // output of phase 5
-                String diffFile = diffFieldsFold + "/0.txt";
+                String diffFile = diffFieldsFold + "/diffFields.txt";
 
                 //create the reflection file
-                File reflectionFile = new File(reflectionFold+"/0.txt");
+                File reflectionFile = new File(reflectionFold + "/reflection.txt");
                 reflectionFile.createNewFile();
 
-                System.out.println("reflection begin!!\n");
+                System.out.println("~~~~~~ Begin loading!");
 
                 // reflect at the after state
-                String prefix = "diffFieldAfter " + lastPolluter() + " ";
-                boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
-                if(reflectAfterOneSuccess) {
+                boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectionFile, runner, lastPolluter());
+                if (reflectAfterOneSuccess) {
                     String successfulField = "";
                     try (BufferedReader br = new BufferedReader(new FileReader(reflectionFile))) {
                         String line;
                         while ((line = br.readLine()) != null) {
-                            if(line.contains(" made test success#######")) {
+                            if (line.contains(" made test success#######")) {
                                 successfulField = line.substring(8, line.lastIndexOf(" made test success#######"));
                                 break;
                             }
@@ -396,6 +392,7 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                 }
 
+                System.out.println("~~~~~~ Finish loading!");
             } catch (Exception e) {
                 TestPluginPlugin.mojo().getLog().error(e);
             }
@@ -417,23 +414,26 @@ public class iFixPlusPlugin extends TestPlugin {
         }
     }
 
-    private boolean reflectEachField(String diffFile, File reflectionFile, Runner runner, String prefix) throws IOException {
+    private boolean reflectEachField(String diffFile, File reflectionFile, Runner runner, String polluter) throws IOException {
         boolean reflectSuccess = false;
-        String header = "*************************reflection on " + prefix.split(" ")[0] + "************************\n";
+        String header = "*************************do reflection************************\n";
         Files.write(Paths.get(reflectionFile.getAbsolutePath()), header.getBytes(),
                 StandardOpenOption.APPEND);
         try {
             try (BufferedReader br = new BufferedReader(new FileReader(diffFile))) {
                 String diffField;
                 while ((diffField = br.readLine()) != null) {
-                    System.out.println(prefix + diffField);
-                    String s = prefix + diffField;
-                    write2tmp(s);
+                    Configuration.config().properties().
+                            setProperty("statecapture.phase", "load");
+                    Configuration.config().properties().
+                            setProperty("statecapture.fieldName", diffField);
+                    Configuration.config().properties().
+                            setProperty("statecapture.polluter", lastPolluter());
                     try {
-                        System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+                        System.out.println("## doing reflection");
                         Try<TestRunResult> result = runner.runList(testFailOrder());
                         if (result.get().results().get(dtname).result().toString().equals("PASS")) {
-                            System.out.println("reflection on diffField: " + diffField + " is success!!");
+                            System.out.println("## reflection on diffField: " + diffField + " is success!!");
                             String output = "########" + diffField + " made test success#######\n";
                             Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
                                     StandardOpenOption.APPEND);
@@ -444,7 +444,7 @@ public class iFixPlusPlugin extends TestPlugin {
                                     StandardOpenOption.APPEND);
                         }
                     } catch (Exception e) {
-                        System.out.println("error in reflection for field: "
+                        System.out.println("## Encounter error in reflection for field: "
                                 + diffField + " " + e);
                     }
                 }
@@ -493,30 +493,6 @@ public class iFixPlusPlugin extends TestPlugin {
             }
         }
 
-        // The main function that prints all combinations of size r
-        // in arr[] of size n. This function mainly uses combinationUtil()
-        static List<List<String>>  printCombination(List<String> arr, int r)
-        {
-            // A temporary array to store all combination one by one
-
-            int n = arr.size();
-            List<String> data = new ArrayList<String>();
-            for(int i=0; i<n; i++) {
-                data.add("");
-            }
-            // Print all combination using temporary array 'data[]'
-            List<List<String>> results = new ArrayList<>();
-            combinationUtil(arr, data, 0, n-1, 0, r, results);
-            return results;
-        }
-
-
-    private void write2tmp(String s) throws FileNotFoundException, UnsupportedEncodingException {
-        PrintWriter writer = new PrintWriter(tmpfile, "UTF-8");
-        writer.print(s);
-        writer.close();
-    }
-
     private List<String> victim() {
         List<String> partialOrder = new ArrayList<>();
         partialOrder.add(dtname);
@@ -525,37 +501,33 @@ public class iFixPlusPlugin extends TestPlugin {
 
     private List<String> testPassOrder_full() throws IOException {
         try {
-            System.out.println("$$$$$$$$$$$testPassOrder_full: " + PathManager.modulePath());
+            System.out.println("------ testPassOrder_full: " + PathManager.modulePath());
             List<DependentTest> dtl = new Gson().fromJson(FileUtil.readFile(replayPath), DependentTestList.class).dts();
-            System.out.println("dtl!!!!!!!!!!!");
-            //must have one dt in dtl
             List<String> partialOrder = new ArrayList<String>();
             for(int i = 0; i< dtl.size(); i++ ) {
                 DependentTest dt = dtl.get(i);
-                if(dt.name().equals(dtname)) {
+                if (dt.name().equals(dtname)) {
                     for(String s: dt.intended().order()) {
                         partialOrder.add(s);
-                        if(s.equals(dt.name()))
+                        if (s.equals(dt.name()))
                             break;
                     }
-                    if(!partialOrder.contains(dtname)) {
+                    if (!partialOrder.contains(dtname)) {
                         partialOrder.add(dtname);
                     }
-                    System.out.println("testFailOrder_full1 : " + dtname);
                     return partialOrder;
                 }
             }
-            System.out.println("testFailOrder_full2: " + dtname);
             return null;
 
         } catch (Exception e) {
-            System.out.println("exception in reading json!!!!!");
+            System.out.println("## Encounter exception in reading json!");
             return null;
         }
     }
 
     private List<String> testFailOrder() throws IOException {
-        if(replayPath2.toString().equals("")) {
+        if (replayPath2.toString().equals("")) {
             return testFailOrder_full();
         }
         else {
@@ -565,31 +537,27 @@ public class iFixPlusPlugin extends TestPlugin {
 
     private List<String> testFailOrder_full() throws IOException {
         try {
-            System.out.println("$$$$$$$$$$$testFailOrder_full: " + PathManager.modulePath());
+            System.out.println("------ testFailOrder_full: " + PathManager.modulePath());
             List<DependentTest> dtl = new Gson().fromJson(FileUtil.readFile(replayPath), DependentTestList.class).dts();
-            System.out.println("dtl!!!!!!!!!!!");
-            //must have one dt in dtl
             List<String> partialOrder = new ArrayList<String>();
             for(int i = 0; i< dtl.size(); i++ ) {
                 DependentTest dt = dtl.get(i);
-                if(dt.name().equals(dtname)) {
+                if (dt.name().equals(dtname)) {
                     for(String s: dt.revealed().order()) {
                         partialOrder.add(s);
-                        if(s.equals(dt.name()))
+                        if (s.equals(dt.name()))
                             break;
                     }
-                    if(!partialOrder.contains(dtname)) {
+                    if (!partialOrder.contains(dtname)) {
                         partialOrder.add(dtname);
                     }
-                    System.out.println("testFailOrder_full1 : " + dtname);
                     return partialOrder;
                 }
             }
-            System.out.println("testFailOrder_full2: " + dtname);
             return null;
 
         } catch (Exception e) {
-            System.out.println("exception in reading json!!!!!");
+            System.out.println("## Encounter exception in reading json!");
             return null;
         }
     }
@@ -597,11 +565,9 @@ public class iFixPlusPlugin extends TestPlugin {
     private List<String> testFailOrder_minimized() throws IOException {
         List<String> failingTests = new ArrayList<String>();
         try {
-            System.out.println("$$$$$$$$$$$replayPath2: " + replayPath2);
             List<PolluterData> polluters = new Gson().fromJson(FileUtil.readFile(replayPath2), MinimizeTestsResult.class).polluters();
-            System.out.println("polluters!!!!!!!!!!!");
             for(PolluterData pd: polluters) {
-                if(pd.deps().size() >=1) {
+                if (pd.deps().size() >=1) {
                     failingTests.addAll(pd.deps());
                     failingTests.add(dtname);
                     return failingTests;
@@ -609,13 +575,13 @@ public class iFixPlusPlugin extends TestPlugin {
             }
             return null;
         } catch (Exception e) {
-            System.out.println("exception in reading json for failing order!!!!!");
+            System.out.println("## Encounter exception in reading json for failing order!");
             return null;
         }
     }
 
     private String lastPolluter() {
-        if(replayPath2.toString().equals("")) {
+        if (replayPath2.toString().equals("")) {
             return lastPolluter_full();
         }
         else {
@@ -628,24 +594,22 @@ public class iFixPlusPlugin extends TestPlugin {
             List<String> failorder = testFailOrder_full();
             return failorder.get(failorder.size()-2);
         } catch (Exception e) {
-            System.out.println("exception in lastPolluter_full!!!!!");
+            System.out.println("Encounter exception in lastPolluter_full!");
             return null;
         }
     }
 
     private String lastPolluter_minimized() {
         try {
-            System.out.println("$$$$$$$$$$$replayPath2: " + replayPath2);
             List<PolluterData> polluters = new Gson().fromJson(FileUtil.readFile(replayPath2), MinimizeTestsResult.class).polluters();
-            System.out.println("polluters!!!!!!!!!!!");
             for(PolluterData pd: polluters) {
-                if(pd.deps().size() >=1) {
+                if (pd.deps().size() >=1) {
                     return pd.deps().get(pd.deps().size()-1);
                 }
             }
             return null;
         } catch (Exception e) {
-            System.out.println("exception in reading json for failing order!!!!!");
+            System.out.println("Encounter exception in reading json for failing order!");
             return null;
         }
     }
@@ -653,8 +617,8 @@ public class iFixPlusPlugin extends TestPlugin {
     int countDirNums(String path) {
         File [] list = new File(path).listFiles();
         int num = 0;
-        for (File file : list){
-            if (file.isDirectory()){
+        for (File file : list) {
+            if (file.isDirectory()) {
                 num ++;
             }
         }
@@ -665,7 +629,7 @@ public class iFixPlusPlugin extends TestPlugin {
         try {
             diffSub();
         }
-        catch (Exception e){
+        catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -675,7 +639,6 @@ public class iFixPlusPlugin extends TestPlugin {
         try {
             // create a string builder
             StringBuilder sb = new StringBuilder();
-            System.out.println("REACH 0");
             Diff diff = DiffBuilder.compare(beforeState).withTest(afterState).
                     withNodeMatcher(new DefaultNodeMatcher(
                             ElementSelectors.byName
@@ -718,9 +681,9 @@ public class iFixPlusPlugin extends TestPlugin {
     }
 
     private void diffSub() throws FileNotFoundException, UnsupportedEncodingException {
-        String subxml0 = subxmlFold + "/0xml";
-        String subxml1 = subxmlFold + "/1xml";
-        String afterRootPath= rootFold + "/1.txt";
+        String subxml0 = subxmlFold + "/passing_order_xml";
+        String subxml1 = subxmlFold + "/failing_order_xml";
+        String afterRootPath= rootFold + "/failing_order.txt";
         System.out.println(subxml0 + "; " + subxml1 + "; " + afterRootPath + "; ");
         Set<String> afterRoots = File2SetString(afterRootPath);
 
@@ -731,15 +694,15 @@ public class iFixPlusPlugin extends TestPlugin {
             String path1 = subxml1 + "/" + s + ".xml";
             String state0 = ""; String state1 = "";
             File file0 = new File(path0);
-            if(!file0.exists()){
+            if (!file0.exists()) {
                 continue;
             }
             else {
-                try{
+                try {
                     state0 = readFile(path0);
                     state1 = readFile(path1);
                 }
-                catch(IOException e) {
+                catch (IOException e) {
                     e.printStackTrace();
                 }
 
@@ -751,10 +714,8 @@ public class iFixPlusPlugin extends TestPlugin {
                 }
             }
         }
-        System.out.println(diffFields_filtered + "; ");
-        int num = new File(diffFieldsFold).listFiles().length;
-        System.out.println(diffFieldsFold + "; ");
-        PrintWriter writer = new PrintWriter(diffFieldsFold + "/" + num+ ".txt", "UTF-8");
+
+        PrintWriter writer = new PrintWriter(diffFieldsFold + "/" + "diffFields.txt", "UTF-8");
 
         for(String ff: diffFields_filtered) {
 
