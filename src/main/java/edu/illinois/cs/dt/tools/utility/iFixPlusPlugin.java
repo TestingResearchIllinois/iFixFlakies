@@ -310,8 +310,6 @@ public class iFixPlusPlugin extends TestPlugin {
                             setProperty("statecapture.phase", "capture_after");
                     Configuration.config().properties().
                             setProperty("statecapture.state", "failing_order");
-                    Configuration.config().properties().
-                            setProperty("statecapture.polluter", lastPolluter());
                     System.out.println("~~~~~~ Begin capturing the state in failing order!!");
                     try {
                         runner.runList(testFailOrder());
@@ -428,7 +426,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     Configuration.config().properties().
                             setProperty("statecapture.fieldName", diffField);
                     Configuration.config().properties().
-                            setProperty("statecapture.polluter", lastPolluter());
+                            setProperty("replay.dtname", polluter);
                     try {
                         System.out.println("## doing reflection");
                         Try<TestRunResult> result = runner.runList(testFailOrder());
@@ -457,41 +455,6 @@ public class iFixPlusPlugin extends TestPlugin {
         return reflectSuccess;
 
     }
-
-        /* arr[]  ---> Input Array
-        data[] ---> Temporary array to store current combination
-        start & end ---> Staring and Ending indexes in arr[]
-        index  ---> Current index in data[]
-        r ---> Size of a combination to be printed */
-        static void combinationUtil(List<String> arr, List<String> data, int start,
-                                    int end, int index, int r, List<List<String>> results)
-        {
-            // Current combination is ready to be printed, print it
-            if (index == r)
-            {
-                for (int j=0; j<r; j++)
-                    System.out.print(data.get(j) +" ");
-                System.out.println("");
-
-                List<String> subresults = new ArrayList<>();
-                for (int j=0; j<r; j++) {
-                    subresults.add(data.get(j));
-                }
-
-                results.add(subresults);
-                return;
-            }
-
-            // replace index with all possible elements. The condition
-            // "end-i+1 >= r-index" makes sure that including one element
-            // at index will make a combination with remaining elements
-            // at remaining positions
-            for (int i=start; i<=end && end-i+1 >= r-index; i++)
-            {
-                data.set(index, arr.get(i));
-                combinationUtil(arr, data, i+1, end, index+1, r, results);
-            }
-        }
 
     private List<String> victim() {
         List<String> partialOrder = new ArrayList<>();
