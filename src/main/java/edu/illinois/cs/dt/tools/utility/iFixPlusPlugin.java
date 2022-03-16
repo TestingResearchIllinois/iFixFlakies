@@ -49,14 +49,12 @@ public class iFixPlusPlugin extends TestPlugin {
     private Path replayPath2;
     private String dtname;
     private String subxmlFold;
-    private String rootFold;
+    private String rootFile;
     private String module;
     private String output;
-    private String slug;
-    private String tmpfile;
-    private String diffFieldsFold;
+    private String diffFieldsFile;
     private String subdiffsFold;
-    private String reflectionFold;
+    private String reflectionFile;
 
     private Set<String> diffFields_filtered = new HashSet<String> ();
 
@@ -116,19 +114,14 @@ public class iFixPlusPlugin extends TestPlugin {
 
         replayPath = Paths.get(Configuration.config().getProperty("replay.path"));
         replayPath2 = Paths.get(Configuration.config().getProperty("replay.path2"));
-        dtname= Configuration.config().getProperty("replay.dtname");
+        dtname= Configuration.config().getProperty("statecapture.testname");
         output= Configuration.config().getProperty("replay.output");
-        slug= Configuration.config().getProperty("replay.slug");
-        subxmlFold = Configuration.config().getProperty("replay.subxmlFold");
-        rootFold = Configuration.config().getProperty("replay.rootFold");
-        tmpfile = Configuration.config().getProperty("replay.tmpfile");
+        subxmlFold = Configuration.config().getProperty("statecapture.subxmlFold");
+        rootFile = Configuration.config().getProperty("statecapture.rootFile");
         module = Configuration.config().getProperty("replay.module");
-        diffFieldsFold = Configuration.config().getProperty("replay.diffFieldsFold");
+        diffFieldsFile = Configuration.config().getProperty("replay.diffFieldsFile");
         subdiffsFold = Configuration.config().getProperty("replay.subdiffsFold");
-        reflectionFold = Configuration.config().getProperty("replay.reflectionFold");
-
-        int xmlFileNum = countDirNums(subxmlFold);
-        System.out.println("xmlFileName: " + xmlFileNum);
+        reflectionFile = Configuration.config().getProperty("statecapture.reflectionFile");
 
         if (runner != null && module.equals(PathManager.modulePath().toString())) {
             System.out.println("replyPath: " + replayPath);
@@ -232,7 +225,15 @@ public class iFixPlusPlugin extends TestPlugin {
                     Configuration.config().properties().
                             setProperty("statecapture.phase", "capture_after");
                     Configuration.config().properties().
-                            setProperty("statecapture.state", "passing_order");
+                            setProperty("statecapture.rootFile", rootFile.substring(0, rootFile.lastIndexOf("/")) + "/passing_order.txt");
+                    String allFieldsFold = Configuration.config().getProperty("statecapture.allFieldsFile").substring(0,
+                            Configuration.config().getProperty("statecapture.allFieldsFile").lastIndexOf("/"));
+                    Configuration.config().properties().
+                            setProperty("statecapture.allFieldsFile", allFieldsFold + "/passing_order.txt");
+                    Configuration.config().properties().
+                            setProperty("statecapture.subxmlFold", subxmlFold + "/passing_order_xml");
+                    System.out.println(Configuration.config().getProperty("statecapture.rootFile") + ";"
+                            + Configuration.config().getProperty("statecapture.allFieldsFile"));
                     try {
                         runner.runList(victim());
                     }
@@ -252,7 +253,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     Configuration.config().properties().
                             setProperty("statecapture.phase", "capture_after");
                     Configuration.config().properties().
-                            setProperty("statecapture.state", "double_victim");
+                            setProperty("statecapture.state", "eagerload");
                     try {
                         runner.runList(victim());
                     }
@@ -261,11 +262,21 @@ public class iFixPlusPlugin extends TestPlugin {
                     }
                     System.out.println("~~~~~~ Finish loading the classes when the test is a double victim!");
                     System.out.println("~~~~~~ Begin capturing the state in passing order(double victim)!!!");
+                    Configuration.config().properties().
+                            setProperty("statecapture.state", "normal");
                     // phase 3: run passorder (indicated in the json) state capture;
                     Configuration.config().properties().
                             setProperty("statecapture.phase", "capture_before");
                     Configuration.config().properties().
-                            setProperty("statecapture.state", "passing_order");
+                            setProperty("statecapture.rootFile", rootFile.substring(0, rootFile.lastIndexOf("/")) + "/passing_order.txt");
+                    String allFieldsFold = Configuration.config().getProperty("statecapture.allFieldsFile").substring(0,
+                            Configuration.config().getProperty("statecapture.allFieldsFile").lastIndexOf("/"));
+                    Configuration.config().properties().
+                            setProperty("statecapture.allFieldsFile", allFieldsFold + "/passing_order.txt");
+                    Configuration.config().properties().
+                            setProperty("statecapture.subxmlFold", subxmlFold + "/passing_order_xml");
+                    System.out.println(Configuration.config().getProperty("statecapture.rootFile") + ";"
+                            + Configuration.config().getProperty("statecapture.allFieldsFile"));
                     try {
                         runner.runList(testPassOrder_full());
                     }
@@ -282,15 +293,20 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("~~~~~~ Finish phase capturing the state in passing order(double victim)!!");
                 }
 
-                xmlFileNum = countDirNums(subxmlFold);
-                System.out.println("xmlFileName: " + xmlFileNum);
-
                 // phase 4: failing order before state capture;
                 System.out.println("~~~~~~ Begin capturing the state in failing order!!");
                 Configuration.config().properties().
                         setProperty("statecapture.phase", "capture_before");
                 Configuration.config().properties().
-                        setProperty("statecapture.state", "failing_order");
+                        setProperty("statecapture.rootFile", rootFile.substring(0, rootFile.lastIndexOf("/")) + "/failing_order.txt");
+                String allFieldsFold = Configuration.config().getProperty("statecapture.allFieldsFile").substring(0,
+                        Configuration.config().getProperty("statecapture.allFieldsFile").lastIndexOf("/"));
+                Configuration.config().properties().
+                        setProperty("statecapture.allFieldsFile", allFieldsFold + "/failing_order.txt");
+                Configuration.config().properties().
+                        setProperty("statecapture.subxmlFold", subxmlFold + "/failing_order_xml");
+                System.out.println(Configuration.config().getProperty("statecapture.rootFile") + ";"
+                        + Configuration.config().getProperty("statecapture.allFieldsFile"));
                 try {
                     runner.runList(testFailOrder());
                 }
@@ -309,7 +325,15 @@ public class iFixPlusPlugin extends TestPlugin {
                     Configuration.config().properties().
                             setProperty("statecapture.phase", "capture_after");
                     Configuration.config().properties().
-                            setProperty("statecapture.state", "failing_order");
+                            setProperty("statecapture.rootFile", rootFile.substring(0, rootFile.lastIndexOf("/")) + "/failing_order.txt");
+                    allFieldsFold = Configuration.config().getProperty("statecapture.allFieldsFile").substring(0,
+                            Configuration.config().getProperty("statecapture.allFieldsFile").lastIndexOf("/"));
+                    Configuration.config().properties().
+                            setProperty("statecapture.allFieldsFile", allFieldsFold + "/failing_order.txt");
+                    Configuration.config().properties().
+                            setProperty("statecapture.subxmlFold", subxmlFold + "/failing_order_xml");
+                    System.out.println(Configuration.config().getProperty("statecapture.rootFile") + ";"
+                            + Configuration.config().getProperty("statecapture.allFieldsFile"));
                     System.out.println("~~~~~~ Begin capturing the state in failing order!!");
                     try {
                         runner.runList(testFailOrder());
@@ -330,10 +354,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 // phase 5: do the diff
                 System.out.println("~~~~~~ Begin diffing between the passing order and failing order!!!");
 
-                xmlFileNum = countDirNums(subxmlFold);
-                System.out.println("xmlFileNum: " + xmlFileNum);
-
-                File passingSubXmlFolder = new File(subxmlFold + "/failing_order_xml");
+                File passingSubXmlFolder = new File(subxmlFold + "/passing_order_xml");
                 if (passingSubXmlFolder.exists() && failingSubXmlFolder.exists()) {
                     try {
                         diffing();
@@ -351,19 +372,21 @@ public class iFixPlusPlugin extends TestPlugin {
                 System.out.println("~~~~~~ Finish diffing between the passing order and failing order!!!");
 
                 // output of phase 5
-                String diffFile = diffFieldsFold + "/diffFields.txt";
+                String diffFile = diffFieldsFile;
 
                 //create the reflection file
-                File reflectionFile = new File(reflectionFold + "/reflection.txt");
-                reflectionFile.createNewFile();
+                File reflectFile = new File(reflectionFile);
+                reflectFile.createNewFile();
 
                 System.out.println("~~~~~~ Begin loading!");
 
                 // reflect at the after state
-                boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectionFile, runner, lastPolluter());
+                Configuration.config().properties().
+                        setProperty("statecapture.subxmlFold", subxmlFold + "/passing_order_xml");
+                boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectFile, runner, lastPolluter());
                 if (reflectAfterOneSuccess) {
                     String successfulField = "";
-                    try (BufferedReader br = new BufferedReader(new FileReader(reflectionFile))) {
+                    try (BufferedReader br = new BufferedReader(new FileReader(reflectFile))) {
                         String line;
                         while ((line = br.readLine()) != null) {
                             if (line.contains(" made test success#######")) {
@@ -426,7 +449,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     Configuration.config().properties().
                             setProperty("statecapture.fieldName", diffField);
                     Configuration.config().properties().
-                            setProperty("replay.dtname", polluter);
+                            setProperty("statecapture.testname", polluter);
                     try {
                         System.out.println("## doing reflection");
                         Try<TestRunResult> result = runner.runList(testFailOrder());
@@ -624,12 +647,12 @@ public class iFixPlusPlugin extends TestPlugin {
         }
     }
 
-    public String readFile(String path) throws IOException {
+    private String readFile(String path) throws IOException {
         File file = new File(path);
         return FileUtils.readFileToString(file, "UTF-8");
     }
 
-    Set<String> File2SetString(String path) {
+    private Set<String> readFileContentsAsSet(String path) {
         File file = new File(path);
         Set<String> keys = new HashSet<>();
         try (BufferedReader br = new BufferedReader(new FileReader(file))) {
@@ -644,13 +667,12 @@ public class iFixPlusPlugin extends TestPlugin {
     }
 
     private void diffSub() throws FileNotFoundException, UnsupportedEncodingException {
-        String subxml0 = subxmlFold + "/passing_order_xml";
-        String subxml1 = subxmlFold + "/failing_order_xml";
-        String afterRootPath= rootFold + "/failing_order.txt";
-        System.out.println(subxml0 + "; " + subxml1 + "; " + afterRootPath + "; ");
-        Set<String> afterRoots = File2SetString(afterRootPath);
+        String subxmlFoldPrefix = subxmlFold;
+        String subxml0 = subxmlFoldPrefix + "/passing_order_xml";
+        String subxml1 = subxmlFoldPrefix + "/failing_order_xml";
+        String afterRootPath= Configuration.config().getProperty("statecapture.rootFile"); // ***
+        Set<String> afterRoots = readFileContentsAsSet(afterRootPath);
 
-        System.out.println(diffFieldsFold + "; ");
         for(String s: afterRoots) {
 
             String path0 = subxml0 + "/" + s + ".xml";
@@ -672,13 +694,12 @@ public class iFixPlusPlugin extends TestPlugin {
                 if (!state0.equals(state1)) {
                     diffFields_filtered.add(s);
                     String subdiffFile = subdiffsFold + "/" + s + ".txt";
-                    System.out.println(subdiffFile + "; ");
                     recordsubDiff(state0, state1, subdiffFile);
                 }
             }
         }
 
-        PrintWriter writer = new PrintWriter(diffFieldsFold + "/" + "diffFields.txt", "UTF-8");
+        PrintWriter writer = new PrintWriter(diffFieldsFile, "UTF-8");
 
         for(String ff: diffFields_filtered) {
 
