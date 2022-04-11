@@ -55,6 +55,7 @@ public class iFixPlusPlugin extends TestPlugin {
     private String diffFieldsFile;
     private String subdiffsFold;
     private String reflectionFile;
+    private String eagerloadfile;
 
     private Set<String> diffFields_filtered = new HashSet<String> ();
 
@@ -122,6 +123,7 @@ public class iFixPlusPlugin extends TestPlugin {
         diffFieldsFile = Configuration.config().getProperty("replay.diffFieldsFile");
         subdiffsFold = Configuration.config().getProperty("replay.subdiffsFold");
         reflectionFile = Configuration.config().getProperty("statecapture.reflectionFile");
+        eagerloadfile = Configuration.config().getProperty("statecapture.eagerloadfile");
 
         if (runner != null && module.equals(PathManager.modulePath().toString())) {
             System.out.println("replyPath: " + replayPath);
@@ -254,6 +256,8 @@ public class iFixPlusPlugin extends TestPlugin {
                             setProperty("statecapture.phase", "capture_after");
                     Configuration.config().properties().
                             setProperty("statecapture.state", "eagerload");
+                    Configuration.config().properties().
+                            setProperty("statecapture.eagerloadfile", eagerloadfile);
                     try {
                         runner.runList(victim());
                     }
@@ -670,7 +674,7 @@ public class iFixPlusPlugin extends TestPlugin {
         String subxmlFoldPrefix = subxmlFold;
         String subxml0 = subxmlFoldPrefix + "/passing_order_xml";
         String subxml1 = subxmlFoldPrefix + "/failing_order_xml";
-        String afterRootPath= Configuration.config().getProperty("statecapture.rootFile"); // ***
+        String afterRootPath = Configuration.config().getProperty("statecapture.rootFile"); // ***
         Set<String> afterRoots = readFileContentsAsSet(afterRootPath);
 
         for(String s: afterRoots) {
